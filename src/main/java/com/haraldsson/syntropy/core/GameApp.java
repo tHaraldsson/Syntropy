@@ -17,6 +17,9 @@ import com.haraldsson.syntropy.entities.Item;
 import com.haraldsson.syntropy.entities.ItemType;
 import com.haraldsson.syntropy.entities.Miner;
 import com.haraldsson.syntropy.input.PlayerController;
+import com.haraldsson.syntropy.systems.EventSystem;
+import com.haraldsson.syntropy.systems.ResearchSystem;
+import com.haraldsson.syntropy.systems.Technology;
 import com.haraldsson.syntropy.systems.TaskSystem;
 import com.haraldsson.syntropy.world.Tile;
 import com.haraldsson.syntropy.world.World;
@@ -38,6 +41,8 @@ public class GameApp extends ApplicationAdapter {
     private World world;
     private PlayerController playerController;
     private TaskSystem taskSystem;
+    private ResearchSystem researchSystem;
+    private EventSystem eventSystem;
 
     private String statusMessage = "";
     private float statusTimer;
@@ -58,6 +63,8 @@ public class GameApp extends ApplicationAdapter {
         world = WorldGenerator.generate(WORLD_WIDTH, WORLD_HEIGHT);
         playerController = new PlayerController(world, camera, viewport, TILE_SIZE);
         taskSystem = new TaskSystem();
+        researchSystem = new ResearchSystem();
+        eventSystem = new EventSystem();
 
         centerCameraOnWorld();
     }
@@ -74,9 +81,12 @@ public class GameApp extends ApplicationAdapter {
         float delta = Gdx.graphics.getDeltaTime();
 
         handleSaveLoad();
+        handleResearchInput();
 
         playerController.update(delta);
         taskSystem.update(world, delta);
+        researchSystem.update(delta);
+        eventSystem.update(world, delta);
         world.update(delta);
 
         if (statusTimer > 0) statusTimer -= delta;
@@ -109,10 +119,24 @@ public class GameApp extends ApplicationAdapter {
                 world = SaveLoadSystem.load("syntropy_save.json");
                 playerController = new PlayerController(world, camera, viewport, TILE_SIZE);
                 taskSystem = new TaskSystem();
+                researchSystem = new ResearchSystem();
+                eventSystem = new EventSystem();
                 centerCameraOnWorld();
                 showStatus("Game loaded!");
             } catch (Exception e) {
                 showStatus("Load failed: " + e.getMessage());
+            }
+        }
+    }
+
+    private void handleResearchInput() {
+        if (Gdx.input.isKeyJustPressed(Input.Keys.R)) {
+            researchSystem.startNextResearch();
+            Technology current = researchSystem.getCurrentResearch();
+            if (current != null && !current.isUnlocked()) {
+                showStatus("Researching: " + current.getName());
+            } else {
+                showStatus("All research complete!");
             }
         }
     }
@@ -337,7 +361,7 @@ public class GameApp extends ApplicationAdapter {
         }
 
         smallFont.setColor(0.6f, 0.6f, 0.6f, 1f);
-        smallFont.draw(spriteBatch, "[DblClick] Possess  [WASD] Move/Pan  [E] Pickup/Drop  [Scroll] Zoom  [F5] Save  [F9] Load", 10, 20);
+        smallFont.draw(spriteBatch, "[DblClick] Possess  [WASD] Move/Pan  [E] Pickup/Drop  [R] Research  [Scroll] Zoom  [F5] Save  [F9] Load", 10, 20);
 
         Colonist possessed = playerController.getPossessed();
         if (possessed != null) {
@@ -346,11 +370,35 @@ public class GameApp extends ApplicationAdapter {
             font.setColor(Color.WHITE);
         }
 
+        // Research info
+        Technology currentTech = researchSystem.getCurrentResearch();
+        if (currentTech != null) {
+            float researchY = screenH - 100;
+            if (currentTech.isUnlocked()) {
+                font.setColor(Color.GREEN);
+                font.draw(spriteBatch, "Researched: " + currentTech.getName() + " ✓", 10, researchY);
+            } else {
+                font.setColor(0.6f, 0.8f, 1f, 1f);
+                int pct = (int) (currentTech.getProgressRatio() * 100);
+                font.draw(spriteBatch, "Researching: " + currentTech.getName() + " " + pct + "%", 10, researchY);
+            }
+            font.setColor(Color.WHITE);
+        }
+
+        // Event log (bottom-right)
+        java.util.List<String> events = eventSystem.getEventLog();
+        float eventY = 60;
+        smallFont.setColor(0.9f, 0.7f, 0.3f, 1f);
+        for (int i = events.size() - 1; i >= 0 && i >= events.size() - 3; i--) {
+            smallFont.draw(spriteBatch, events.get(i), 10, eventY);
+            eventY += 14;
+        }
+
         // Pickup message
         String pickupMsg = playerController.getPickupMessage();
         if (!pickupMsg.isEmpty()) {
             font.setColor(Color.CYAN);
-            font.draw(spriteBatch, pickupMsg, 10, screenH - 100);
+            font.draw(spriteBatch, pickupMsg, 10, screenH - 120);
             font.setColor(Color.WHITE);
         }
 

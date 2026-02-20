@@ -1,7 +1,7 @@
 package com.haraldsson.syntropy.world;
 
 import com.haraldsson.syntropy.entities.Colonist;
-import com.haraldsson.syntropy.entities.Item;
+import com.haraldsson.syntropy.entities.FoodGrower;
 import com.haraldsson.syntropy.entities.ItemType;
 import com.haraldsson.syntropy.entities.Miner;
 
@@ -10,16 +10,13 @@ import java.util.Collections;
 import java.util.List;
 
 public class World {
-    private static final float FOOD_INTERVAL_SECONDS = 8f;
-    private static final int STOCKPILE_FOOD_CAP = 6;
-
     private final int width;
     private final int height;
     private final Tile[][] tiles;
     private final List<Colonist> colonists = new ArrayList<>();
     private final List<Miner> miners = new ArrayList<>();
+    private final List<FoodGrower> foodGrowers = new ArrayList<>();
     private Tile stockpileTile;
-    private float foodTimer;
 
     public World(int width, int height, Tile[][] tiles) {
         this.width = width;
@@ -31,24 +28,12 @@ public class World {
         for (Miner miner : miners) {
             miner.update(delta, this);
         }
+        for (FoodGrower grower : foodGrowers) {
+            grower.update(delta, this);
+        }
         for (Colonist colonist : colonists) {
             colonist.updateNeeds(delta);
             clampColonist(colonist);
-        }
-        tickFoodStockpile(delta);
-    }
-
-    private void tickFoodStockpile(float delta) {
-        if (stockpileTile == null) {
-            return;
-        }
-        if (stockpileTile.countItems(ItemType.FOOD) >= STOCKPILE_FOOD_CAP) {
-            return;
-        }
-        foodTimer += delta;
-        if (foodTimer >= FOOD_INTERVAL_SECONDS) {
-            foodTimer = 0f;
-            stockpileTile.addItem(new Item(ItemType.FOOD));
         }
     }
 
@@ -73,6 +58,10 @@ public class World {
         return tiles[x][y];
     }
 
+    public Tile[][] getTiles() {
+        return tiles;
+    }
+
     public List<Colonist> getColonists() {
         return Collections.unmodifiableList(colonists);
     }
@@ -91,6 +80,14 @@ public class World {
 
     public Miner getMiner() {
         return miners.isEmpty() ? null : miners.get(0);
+    }
+
+    public List<FoodGrower> getFoodGrowers() {
+        return Collections.unmodifiableList(foodGrowers);
+    }
+
+    public void addFoodGrower(FoodGrower grower) {
+        foodGrowers.add(grower);
     }
 
     public Tile getStockpileTile() {

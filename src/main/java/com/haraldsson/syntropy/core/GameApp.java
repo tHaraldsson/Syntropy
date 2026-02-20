@@ -2,6 +2,7 @@ package com.haraldsson.syntropy.core;
 
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
@@ -11,6 +12,7 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
 import com.haraldsson.syntropy.entities.Colonist;
+import com.haraldsson.syntropy.entities.FoodGrower;
 import com.haraldsson.syntropy.entities.Item;
 import com.haraldsson.syntropy.entities.ItemType;
 import com.haraldsson.syntropy.entities.Miner;
@@ -22,8 +24,8 @@ import com.haraldsson.syntropy.world.WorldGenerator;
 
 public class GameApp extends ApplicationAdapter {
     public static final int TILE_SIZE = 48;
-    private static final int WORLD_WIDTH = 10;
-    private static final int WORLD_HEIGHT = 10;
+    private static final int WORLD_WIDTH = 30;
+    private static final int WORLD_HEIGHT = 30;
 
     private OrthographicCamera camera;
     private OrthographicCamera hudCamera;
@@ -36,6 +38,9 @@ public class GameApp extends ApplicationAdapter {
     private World world;
     private PlayerController playerController;
     private TaskSystem taskSystem;
+
+    private String statusMessage = "";
+    private float statusTimer;
 
     @Override
     public void create() {
@@ -68,9 +73,13 @@ public class GameApp extends ApplicationAdapter {
     public void render() {
         float delta = Gdx.graphics.getDeltaTime();
 
+        handleSaveLoad();
+
         playerController.update(delta);
         taskSystem.update(world, delta);
         world.update(delta);
+
+        if (statusTimer > 0) statusTimer -= delta;
 
         renderWorld();
         renderHUD();
@@ -84,9 +93,38 @@ public class GameApp extends ApplicationAdapter {
         smallFont.dispose();
     }
 
+    // ── Save / Load ──────────────────────────────────────────────────
+
+    private void handleSaveLoad() {
+        if (Gdx.input.isKeyJustPressed(Input.Keys.F5)) {
+            try {
+                SaveLoadSystem.save(world, "syntropy_save.json");
+                showStatus("Game saved!");
+            } catch (Exception e) {
+                showStatus("Save failed: " + e.getMessage());
+            }
+        }
+        if (Gdx.input.isKeyJustPressed(Input.Keys.F9)) {
+            try {
+                world = SaveLoadSystem.load("syntropy_save.json");
+                playerController = new PlayerController(world, camera, viewport, TILE_SIZE);
+                taskSystem = new TaskSystem();
+                centerCameraOnWorld();
+                showStatus("Game loaded!");
+            } catch (Exception e) {
+                showStatus("Load failed: " + e.getMessage());
+            }
+        }
+    }
+
+    private void showStatus(String msg) {
+        statusMessage = msg;
+        statusTimer = 3f;
+    }
+
     private void centerCameraOnWorld() {
-        float worldPixelWidth = WORLD_WIDTH * TILE_SIZE;
-        float worldPixelHeight = WORLD_HEIGHT * TILE_SIZE;
+        float worldPixelWidth = world.getWidth() * TILE_SIZE;
+        float worldPixelHeight = world.getHeight() * TILE_SIZE;
         camera.position.set(worldPixelWidth / 2f, worldPixelHeight / 2f, 0f);
         camera.update();
     }
@@ -99,7 +137,6 @@ public class GameApp extends ApplicationAdapter {
         camera.update();
         shapeRenderer.setProjectionMatrix(camera.combined);
 
-        // Filled pass
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
         renderTiles();
         renderBuildings();
@@ -107,9 +144,8 @@ public class GameApp extends ApplicationAdapter {
         renderColonists();
         shapeRenderer.end();
 
-        // Grid lines
         shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
-        shapeRenderer.setColor(0.08f, 0.08f, 0.08f, 1f);
+        shapeRenderer.setColor(0.08f, 0.08f, 0.08f, 0.3f);
         for (int y = 0; y < world.getHeight(); y++) {
             for (int x = 0; x < world.getWidth(); x++) {
                 shapeRenderer.rect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
@@ -117,7 +153,6 @@ public class GameApp extends ApplicationAdapter {
         }
         shapeRenderer.end();
 
-        // World-space text (names, tasks, possession marker)
         spriteBatch.setProjectionMatrix(camera.combined);
         spriteBatch.begin();
         for (Colonist colonist : world.getColonists()) {
@@ -136,9 +171,7 @@ public class GameApp extends ApplicationAdapter {
         Colonist possessed = playerController.getPossessed();
         if (possessed != null) {
             font.setColor(Color.RED);
-            float px = possessed.getX() * TILE_SIZE;
-            float py = possessed.getY() * TILE_SIZE;
-            font.draw(spriteBatch, "[P]", px + 10, py + TILE_SIZE + 34);
+            font.draw(spriteBatch, "[P]", possessed.getX() * TILE_SIZE + 10, possessed.getY() * TILE_SIZE + TILE_SIZE + 34);
             font.setColor(Color.WHITE);
         }
         spriteBatch.end();
@@ -149,10 +182,10 @@ public class GameApp extends ApplicationAdapter {
             for (int x = 0; x < world.getWidth(); x++) {
                 float px = x * TILE_SIZE;
                 float py = y * TILE_SIZE;
-                shapeRenderer.setColor(0.15f, 0.2f, 0.15f, 1f);
+                Tile tile = world.getTile(x, y);
+                shapeRenderer.setColor(tile.getTerrainType().r, tile.getTerrainType().g, tile.getTerrainType().b, 1f);
                 shapeRenderer.rect(px, py, TILE_SIZE, TILE_SIZE);
 
-                Tile tile = world.getTile(x, y);
                 if (tile.isStockpile()) {
                     shapeRenderer.setColor(0.12f, 0.2f, 0.4f, 1f);
                     shapeRenderer.rect(px + 4, py + 4, TILE_SIZE - 8, TILE_SIZE - 8);
@@ -167,10 +200,20 @@ public class GameApp extends ApplicationAdapter {
             float py = miner.getY() * TILE_SIZE;
             shapeRenderer.setColor(0.35f, 0.35f, 0.35f, 1f);
             shapeRenderer.rect(px + 6, py + 6, TILE_SIZE - 12, TILE_SIZE - 12);
-            // Small indicator for output count
             int count = Math.min(miner.getOutputCount(), 5);
             for (int i = 0; i < count; i++) {
                 shapeRenderer.setColor(0.55f, 0.55f, 0.55f, 1f);
+                shapeRenderer.rect(px + 10 + i * 6, py + 10, 4, 4);
+            }
+        }
+        for (FoodGrower grower : world.getFoodGrowers()) {
+            float px = grower.getX() * TILE_SIZE;
+            float py = grower.getY() * TILE_SIZE;
+            shapeRenderer.setColor(0.25f, 0.45f, 0.2f, 1f);
+            shapeRenderer.rect(px + 6, py + 6, TILE_SIZE - 12, TILE_SIZE - 12);
+            int count = Math.min(grower.getOutputCount(), 5);
+            for (int i = 0; i < count; i++) {
+                shapeRenderer.setColor(0.85f, 0.75f, 0.25f, 1f);
                 shapeRenderer.rect(px + 10 + i * 6, py + 10, 4, 4);
             }
         }
@@ -214,7 +257,6 @@ public class GameApp extends ApplicationAdapter {
             }
             shapeRenderer.rect(cx + 12, cy + 12, TILE_SIZE - 24, TILE_SIZE - 24);
 
-            // Carried item
             if (colonist.getCarriedItem() != null) {
                 if (colonist.getCarriedItem().getType() == ItemType.STONE) {
                     shapeRenderer.setColor(0.6f, 0.6f, 0.6f, 1f);
@@ -224,7 +266,6 @@ public class GameApp extends ApplicationAdapter {
                 shapeRenderer.rect(cx + 18, cy + 18, 6, 6);
             }
 
-            // Need bars: hunger, energy, mood
             float barY = cy + TILE_SIZE - 6;
             float barWidth = TILE_SIZE - 16;
             drawBar(cx + 8, barY, barWidth, colonist.getHunger() / 100f, 0.2f, 0.8f, 0.3f);
@@ -250,7 +291,6 @@ public class GameApp extends ApplicationAdapter {
         float screenW = Gdx.graphics.getWidth();
         float screenH = Gdx.graphics.getHeight();
 
-        // Top-left: resource info
         int totalStone = 0;
         int totalFood = 0;
         Tile stockpile = world.getStockpileTile();
@@ -261,16 +301,19 @@ public class GameApp extends ApplicationAdapter {
         font.setColor(Color.WHITE);
         font.draw(spriteBatch, "Stockpile  Stone: " + totalStone + "  Food: " + totalFood, 10, screenH - 10);
 
-        // Top-left: miner info
         float yOffset = screenH - 30;
         for (int i = 0; i < world.getMiners().size(); i++) {
             Miner m = world.getMiners().get(i);
             font.draw(spriteBatch, "Miner " + (i + 1) + " output: " + m.getOutputCount(), 10, yOffset);
             yOffset -= 18;
         }
+        for (int i = 0; i < world.getFoodGrowers().size(); i++) {
+            FoodGrower fg = world.getFoodGrowers().get(i);
+            font.draw(spriteBatch, "FoodGrower " + (i + 1) + " output: " + fg.getOutputCount(), 10, yOffset);
+            yOffset -= 18;
+        }
 
-        // Top-right: colonist list
-        float rightX = screenW - 200;
+        float rightX = screenW - 220;
         float listY = screenH - 10;
         font.setColor(Color.LIGHT_GRAY);
         font.draw(spriteBatch, "-- Colonists --", rightX, listY);
@@ -293,15 +336,20 @@ public class GameApp extends ApplicationAdapter {
             listY -= 18;
         }
 
-        // Bottom-left: controls help
         smallFont.setColor(0.6f, 0.6f, 0.6f, 1f);
-        smallFont.draw(spriteBatch, "[P] Possess/Unpossess   [WASD] Move (possessed)   [Arrows] Pan camera   [Scroll] Zoom", 10, 20);
+        smallFont.draw(spriteBatch, "[P] Possess  [WASD] Move  [Arrows] Pan  [Scroll] Zoom  [F5] Save  [F9] Load", 10, 20);
 
-        // Possession banner
         Colonist possessed = playerController.getPossessed();
         if (possessed != null) {
             font.setColor(Color.RED);
             font.draw(spriteBatch, "POSSESSING: " + possessed.getName(), 10, screenH - 80);
+            font.setColor(Color.WHITE);
+        }
+
+        // Status message (save/load feedback)
+        if (statusTimer > 0) {
+            font.setColor(Color.YELLOW);
+            font.draw(spriteBatch, statusMessage, screenW / 2f - 60, screenH / 2f);
             font.setColor(Color.WHITE);
         }
 

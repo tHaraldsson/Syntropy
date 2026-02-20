@@ -1,6 +1,7 @@
 package com.haraldsson.syntropy.systems;
 
 import com.haraldsson.syntropy.entities.Colonist;
+import com.haraldsson.syntropy.entities.FoodGrower;
 import com.haraldsson.syntropy.entities.Item;
 import com.haraldsson.syntropy.entities.ItemType;
 import com.haraldsson.syntropy.entities.Miner;
@@ -104,6 +105,23 @@ public class TaskSystem {
             colonist.moveTowardTarget(delta, MOVE_SPEED);
             if (colonist.isAtTarget()) {
                 Item output = miner.takeOutput();
+                if (output != null) {
+                    colonist.setCarriedItem(output);
+                }
+                colonist.clearTask();
+            }
+            return true;
+        }
+
+        // Find any food grower with output
+        for (FoodGrower grower : world.getFoodGrowers()) {
+            if (!grower.hasOutput()) {
+                continue;
+            }
+            colonist.setTask(TaskType.MOVE_TO_FOOD_GROWER, grower.getX(), grower.getY());
+            colonist.moveTowardTarget(delta, MOVE_SPEED);
+            if (colonist.isAtTarget()) {
+                Item output = grower.takeOutput();
                 if (output != null) {
                     colonist.setCarriedItem(output);
                 }

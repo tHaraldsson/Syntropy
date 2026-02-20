@@ -5,14 +5,17 @@ import com.haraldsson.syntropy.world.World;
 import java.util.ArrayList;
 import java.util.List;
 
-public class Miner extends Building {
-    private static final float PRODUCTION_INTERVAL = 5f;
+/**
+ * A building that periodically produces food items.
+ */
+public class FoodGrower extends Building {
+    private static final float PRODUCTION_INTERVAL = 10f;
     private static final int MAX_OUTPUT = 5;
 
     private final List<Item> outputBuffer = new ArrayList<>();
     private float timer;
 
-    public Miner(int x, int y) {
+    public FoodGrower(int x, int y) {
         super(x, y);
     }
 
@@ -21,7 +24,7 @@ public class Miner extends Building {
         timer += delta;
         if (timer >= PRODUCTION_INTERVAL && outputBuffer.size() < MAX_OUTPUT) {
             timer = 0f;
-            outputBuffer.add(new Item(ItemType.STONE));
+            outputBuffer.add(new Item(ItemType.FOOD));
         }
     }
 

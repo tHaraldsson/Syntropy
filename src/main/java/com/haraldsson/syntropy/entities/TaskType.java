@@ -5,6 +5,7 @@ public enum TaskType {
     MOVE_TO_MINER,
     MOVE_TO_STOCKPILE,
     MOVE_TO_FOOD,
+    MOVE_TO_FOOD_GROWER,
     RESTING,
     WANDER
 }

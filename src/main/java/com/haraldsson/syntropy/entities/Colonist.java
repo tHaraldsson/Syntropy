@@ -61,10 +61,6 @@ public class Colonist {
         }
     }
 
-    public boolean isDead() {
-        return dead;
-    }
-
     public boolean isHungry() {
         return hunger <= 35f;
     }
@@ -152,12 +148,32 @@ public class Colonist {
         return hunger;
     }
 
+    public void setHunger(float hunger) {
+        this.hunger = hunger;
+    }
+
     public float getEnergy() {
         return energy;
     }
 
+    public void setEnergy(float energy) {
+        this.energy = energy;
+    }
+
     public float getMood() {
         return mood;
+    }
+
+    public void setMood(float mood) {
+        this.mood = mood;
+    }
+
+    public boolean isDead() {
+        return dead;
+    }
+
+    public void setDead(boolean dead) {
+        this.dead = dead;
     }
 
     public void setPosition(float x, float y) {

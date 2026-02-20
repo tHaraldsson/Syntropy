@@ -4,6 +4,7 @@ import com.haraldsson.syntropy.ecs.ECSWorld;
 import com.haraldsson.syntropy.ecs.Entity;
 import com.haraldsson.syntropy.ecs.GameSystem;
 import com.haraldsson.syntropy.ecs.components.*;
+import com.haraldsson.syntropy.world.Tile;
 import com.haraldsson.syntropy.world.World;
 
 import java.util.ArrayList;
@@ -20,6 +21,24 @@ public class AgingSystem extends GameSystem {
     @Override
     public void update(ECSWorld ecsWorld, World world, float delta) {
         successionNeeded = false;
+
+        // Despawn dead entities after 30 seconds
+        for (Entity e : ecsWorld.getEntitiesWith(HealthComponent.class)) {
+            HealthComponent health = e.get(HealthComponent.class);
+            if (!health.dead) continue;
+            health.deathTimer += delta;
+            if (health.deathTimer >= 30f) {
+                // Drop any carried item onto the ground before removing
+                InventoryComponent inv = e.get(InventoryComponent.class);
+                PositionComponent pos = e.get(PositionComponent.class);
+                if (inv != null && inv.carriedItem != null && pos != null) {
+                    Tile tile = world.getTile((int) pos.x, (int) pos.y);
+                    if (tile != null) tile.addItem(inv.carriedItem);
+                    inv.carriedItem = null;
+                }
+                ecsWorld.removeEntity(e);
+            }
+        }
 
         for (Entity e : ecsWorld.getEntitiesWith(AgingComponent.class, HealthComponent.class)) {
             HealthComponent health = e.get(HealthComponent.class);
@@ -43,6 +62,12 @@ public class AgingSystem extends GameSystem {
 
     public boolean isSuccessionNeeded() { return successionNeeded; }
     public String getDeathMessage() { return deathMessage; }
+
+    /** Called externally when the leader dies by any cause other than old age. */
+    public void triggerSuccession(String message) {
+        this.successionNeeded = true;
+        this.deathMessage = message;
+    }
 
     /**
      * Get list of living colonists who could be successors.

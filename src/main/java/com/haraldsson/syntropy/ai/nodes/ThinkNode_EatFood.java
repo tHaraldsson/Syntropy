@@ -24,7 +24,14 @@ public class ThinkNode_EatFood extends ThinkNode {
         NeedsComponent needs = entity.get(NeedsComponent.class);
         if (needs == null) return 0f;
         AIComponent ai = entity.get(AIComponent.class);
-        if (ai != null && ai.taskType == TaskType.HAULING) return 80f; // keep hauling in progress
+        InventoryComponent inv = entity.get(InventoryComponent.class);
+        // If we are mid-delivery of food we picked up, keep this node running
+        // at priority 90 — above URGENTLY_HUNGRY (80) but below STARVING (100).
+        if (ai != null && ai.taskType == TaskType.HAULING
+                && inv != null && inv.carriedItem != null
+                && inv.carriedItem.getType() == ItemType.FOOD) {
+            return 90f;
+        }
         return switch (needs.getHungerCategory()) {
             case STARVING        -> 100f;
             case URGENTLY_HUNGRY ->  80f;
@@ -54,7 +61,10 @@ public class ThinkNode_EatFood extends ThinkNode {
         Tile foodTile = world.findNearestFoodTile(pos.x, pos.y);
         if (foodTile != null) {
             // Step 2: Walk to food tile and eat
-            if (ai.taskType != TaskType.MOVE_TO_FOOD) {
+            // Reset timer if target tile has changed
+            if (ai.taskType != TaskType.MOVE_TO_FOOD
+                    || ai.targetX != foodTile.getX()
+                    || ai.targetY != foodTile.getY()) {
                 ai.setTask(TaskType.MOVE_TO_FOOD, foodTile.getX(), foodTile.getY());
                 ai.stuckTimer = 0f;
             }
@@ -119,7 +129,12 @@ public class ThinkNode_EatFood extends ThinkNode {
                 Item output = bc.takeOutput();
                 if (output != null && inv != null) {
                     inv.carriedItem = output;
-                    ai.setTask(TaskType.HAULING, (int) bp.x, (int) bp.y);
+                    Tile stockpile = world.getStockpileTile();
+                    if (stockpile != null) {
+                        ai.setTask(TaskType.HAULING, stockpile.getX(), stockpile.getY());
+                    } else {
+                        ai.clearTask();
+                    }
                 } else {
                     ai.clearTask();
                 }

@@ -1,18 +1,17 @@
 package com.haraldsson.syntropy.systems.mood;
 
 import com.haraldsson.syntropy.ecs.Entity;
-import com.haraldsson.syntropy.ecs.components.NeedsComponent;
+import com.haraldsson.syntropy.ecs.components.SleepQualityComponent;
 
 public class SleepThoughtWorker implements ThoughtWorker {
     @Override
     public float getMoodOffset(Entity entity) {
-        NeedsComponent needs = entity.get(NeedsComponent.class);
-        if (needs == null) return 0f;
-        return switch (needs.getEnergyCategory()) {
-            case RESTED -> 0f;
-            case TIRED -> -3f;
-            case EXHAUSTED -> -12f;
-            case COLLAPSED -> -30f;
+        SleepQualityComponent sq = entity.get(SleepQualityComponent.class);
+        if (sq == null) return 0f;
+        return switch (sq.lastSleepQuality) {
+            case IN_BED    ->   0f;
+            case ON_GROUND -> -10f;
+            case NONE      -> -25f;
         };
     }
 }

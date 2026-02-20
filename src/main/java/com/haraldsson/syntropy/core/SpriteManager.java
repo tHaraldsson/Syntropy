@@ -266,6 +266,8 @@ public class SpriteManager {
     private void generateBuildingTextures() {
         generateMiner();
         generateFoodGrower();
+        generateWoodcutter();
+        generateBed();
     }
 
     private void generateMiner() {
@@ -378,6 +380,73 @@ public class SpriteManager {
         pm.drawRectangle(1, 1, s - 2, s - 2);
 
         textures.put("building_FOOD_GROWER", new Texture(pm));
+        pm.dispose();
+    }
+
+    private void generateWoodcutter() {
+        int s = T - 8;
+        Pixmap pm = new Pixmap(s, s, Pixmap.Format.RGBA8888);
+
+        // Greenish-brown body
+        for (int y = 0; y < s; y++) {
+            for (int x = 0; x < s; x++) {
+                float n = (rng.nextFloat() - 0.5f) * 0.04f;
+                setPixel(pm, x, y, clamp(0.28f + n), clamp(0.22f + n), clamp(0.12f + n));
+            }
+        }
+
+        // Shadow
+        pm.setColor(0.1f, 0.08f, 0.04f, 1f);
+        pm.fillRectangle(2, s - 4, s - 2, 4);
+
+        // Building panel
+        pm.setColor(0.32f, 0.26f, 0.14f, 1f);
+        pm.fillRectangle(4, 4, s - 8, s - 12);
+        pm.setColor(0.38f, 0.3f, 0.18f, 1f);
+        pm.drawRectangle(4, 4, s - 8, s - 12);
+
+        // Axe head detail
+        int midX = s / 2;
+        pm.setColor(0.55f, 0.5f, 0.4f, 1f);
+        pm.fillRectangle(midX - 4, 6, 8, 6);
+        pm.setColor(0.45f, 0.35f, 0.2f, 1f);
+        pm.fillRectangle(midX - 1, 10, 2, 8);
+
+        // Log stack at bottom
+        pm.setColor(0.4f, 0.28f, 0.14f, 1f);
+        pm.fillRectangle(4, s - 10, s - 8, 4);
+        pm.setColor(0.35f, 0.22f, 0.1f, 1f);
+        pm.drawLine(4, s - 8, s - 4, s - 8);
+
+        // Border
+        pm.setColor(0.18f, 0.14f, 0.07f, 1f);
+        pm.drawRectangle(0, 0, s, s);
+
+        textures.put("building_WOODCUTTER", new Texture(pm));
+        pm.dispose();
+    }
+
+    private void generateBed() {
+        int s = T - 8;
+        Pixmap pm = new Pixmap(s, s, Pixmap.Format.RGBA8888);
+
+        // Brown bed frame
+        pm.setColor(0.6f, 0.4f, 0.2f, 1f);
+        pm.fill();
+
+        // White pillow in corner
+        pm.setColor(1f, 1f, 1f, 1f);
+        pm.fillRectangle(4, 4, 10, 10);
+
+        // Blanket area — slightly darker brown
+        pm.setColor(0.5f, 0.32f, 0.15f, 1f);
+        pm.fillRectangle(4, s - s / 2, s - 8, s / 2 - 4);
+
+        // Border
+        pm.setColor(0.35f, 0.22f, 0.1f, 1f);
+        pm.drawRectangle(0, 0, s, s);
+
+        textures.put("building_BED", new Texture(pm));
         pm.dispose();
     }
 

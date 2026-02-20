@@ -106,20 +106,31 @@ public class ThinkNode_DoAssignedJob extends ThinkNode {
             return true;
         }
 
+        Entity nearest = null;
+        float nearestDist = Float.MAX_VALUE;
         for (Entity bldg : ecsWorld.getEntitiesWith(BuildingComponent.class, PositionComponent.class)) {
             BuildingComponent bc = bldg.get(BuildingComponent.class);
             if (!bc.hasOutput()) continue;
             PositionComponent bp = bldg.get(PositionComponent.class);
-            ai.setTask(TaskType.MOVE_TO_MINER, (int) bp.x, (int) bp.y);
-            ai.moveTowardTarget(pos, delta, MOVE_SPEED, world);
-            if (ai.isAtTarget(pos.x, pos.y)) {
-                Item output = bc.takeOutput();
-                if (output != null) inv.carriedItem = output;
-                ai.clearTask();
+            float dx = pos.x - bp.x;
+            float dy = pos.y - bp.y;
+            float dist = dx * dx + dy * dy;
+            if (dist < nearestDist) {
+                nearestDist = dist;
+                nearest = bldg;
             }
-            return true;
         }
-        return false;
+        if (nearest == null) return false;
+        PositionComponent bp = nearest.get(PositionComponent.class);
+        BuildingComponent bc = nearest.get(BuildingComponent.class);
+        ai.setTask(TaskType.MOVE_TO_MINER, (int) bp.x, (int) bp.y);
+        ai.moveTowardTarget(pos, delta, MOVE_SPEED, world);
+        if (ai.isAtTarget(pos.x, pos.y)) {
+            Item output = bc.takeOutput();
+            if (output != null) inv.carriedItem = output;
+            ai.clearTask();
+        }
+        return true;
     }
 
     private boolean executeCollectFrom(Entity entity, ECSWorld ecsWorld, World world, float delta, String buildingType) {
@@ -142,21 +153,32 @@ public class ThinkNode_DoAssignedJob extends ThinkNode {
             return true;
         }
 
+        Entity nearest = null;
+        float nearestDist = Float.MAX_VALUE;
         for (Entity bldg : ecsWorld.getEntitiesWith(BuildingComponent.class, PositionComponent.class)) {
             BuildingComponent bc = bldg.get(BuildingComponent.class);
             if (!buildingType.equals(bc.buildingType) || !bc.hasOutput()) continue;
             PositionComponent bp = bldg.get(PositionComponent.class);
-            TaskType task = "MINER".equals(buildingType) ? TaskType.MOVE_TO_MINER : TaskType.MOVE_TO_FOOD_GROWER;
-            ai.setTask(task, (int) bp.x, (int) bp.y);
-            ai.moveTowardTarget(pos, delta, MOVE_SPEED, world);
-            if (ai.isAtTarget(pos.x, pos.y)) {
-                Item output = bc.takeOutput();
-                if (output != null) inv.carriedItem = output;
-                ai.clearTask();
+            float dx = pos.x - bp.x;
+            float dy = pos.y - bp.y;
+            float dist = dx * dx + dy * dy;
+            if (dist < nearestDist) {
+                nearestDist = dist;
+                nearest = bldg;
             }
-            return true;
         }
-        return false;
+        if (nearest == null) return false;
+        BuildingComponent bc = nearest.get(BuildingComponent.class);
+        PositionComponent bp = nearest.get(PositionComponent.class);
+        TaskType task = "MINER".equals(buildingType) ? TaskType.MOVE_TO_MINER : TaskType.MOVE_TO_FOOD_GROWER;
+        ai.setTask(task, (int) bp.x, (int) bp.y);
+        ai.moveTowardTarget(pos, delta, MOVE_SPEED, world);
+        if (ai.isAtTarget(pos.x, pos.y)) {
+            Item output = bc.takeOutput();
+            if (output != null) inv.carriedItem = output;
+            ai.clearTask();
+        }
+        return true;
     }
 }
 

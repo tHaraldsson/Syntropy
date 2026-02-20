@@ -8,6 +8,8 @@ import com.badlogic.gdx.utils.viewport.Viewport;
 import com.haraldsson.syntropy.ecs.ECSWorld;
 import com.haraldsson.syntropy.ecs.Entity;
 import com.haraldsson.syntropy.ecs.components.*;
+import com.haraldsson.syntropy.entities.EnergyCategory;
+import com.haraldsson.syntropy.entities.HungerCategory;
 import com.haraldsson.syntropy.entities.Item;
 import com.haraldsson.syntropy.entities.ItemType;
 import com.haraldsson.syntropy.world.Tile;
@@ -33,6 +35,7 @@ public class PlayerController {
     private String pickupMessage = "";
     private float pickupMessageTimer;
     private boolean buildModeActive = false;
+    private float sleepTimer = 0f;
 
     public PlayerController(World world, ECSWorld ecsWorld, OrthographicCamera camera, Viewport viewport, int tileSize) {
         this.world = world;
@@ -53,6 +56,7 @@ public class PlayerController {
 
     public void update(float delta) {
         if (pickupMessageTimer > 0) pickupMessageTimer -= delta;
+        if (sleepTimer > 0) sleepTimer -= delta;
 
         if (leader != null) {
             HealthComponent health = leader.get(HealthComponent.class);
@@ -60,8 +64,11 @@ public class PlayerController {
                 handleCameraPan(delta);
                 return;
             }
-            handleLeaderMovement(delta);
+            if (sleepTimer <= 0f) {
+                handleLeaderMovement(delta);
+            }
             handlePickup();
+            handleEatAndSleep();
             handleBuildMode();
             updateCameraFollow();
         } else {
@@ -80,6 +87,9 @@ public class PlayerController {
     }
 
     private void handleLeaderMovement(float delta) {
+        HealthComponent health = leader.get(HealthComponent.class);
+        if (health != null && health.dead) return;
+
         PositionComponent pos = leader.get(PositionComponent.class);
         if (pos == null) return;
 
@@ -96,6 +106,38 @@ public class PlayerController {
 
         pos.x += moveX * MOVE_SPEED * delta;
         pos.y += moveY * MOVE_SPEED * delta;
+    }
+
+    private void handleEatAndSleep() {
+        NeedsComponent needs = leader.get(NeedsComponent.class);
+        if (needs == null) return;
+
+        // F key: eat food from stockpile when hungry
+        if (Gdx.input.isKeyJustPressed(Input.Keys.F)) {
+            if (needs.getHungerCategory() != HungerCategory.FED) {
+                Tile stockpile = world.getStockpileTile();
+                if (stockpile != null && stockpile.hasItem(ItemType.FOOD)) {
+                    stockpile.takeFirstItem(ItemType.FOOD);
+                    needs.eat();
+                    showPickupMessage("Ate food");
+                } else {
+                    showPickupMessage("No food available");
+                }
+            } else {
+                showPickupMessage("Not hungry");
+            }
+        }
+
+        // Z key: rest in place for 3 seconds when tired
+        if (Gdx.input.isKeyJustPressed(Input.Keys.Z)) {
+            if (needs.getEnergyCategory() != EnergyCategory.RESTED) {
+                needs.rest();
+                sleepTimer = 3f;
+                showPickupMessage("Rested");
+            } else {
+                showPickupMessage("Not tired");
+            }
+        }
     }
 
     private void handlePickup() {

@@ -34,6 +34,7 @@ public class GameHud {
     private final Label eventLogLabel;
     private final Label pickupLabel;
     private final Label leaderInfoLabel;
+    private final Label buildModeLabel;
 
     private Texture whitePixel;
 
@@ -91,6 +92,12 @@ public class GameHud {
         bottomRow.add(eventLogLabel).left().expandX().fillX().row();
 
         root.add(bottomRow).bottom().left().fillX().row();
+
+        // Build mode label (centered, overlaid)
+        buildModeLabel = new Label("", skin, "hud-bold");
+        buildModeLabel.setColor(Color.YELLOW);
+        buildModeLabel.setAlignment(Align.center);
+        stage.addActor(buildModeLabel);
     }
 
     private Skin buildSkin() {
@@ -135,13 +142,14 @@ public class GameHud {
         GameEvents gameEvents = gameState.events;
 
         // Resources
-        int totalStone = 0, totalFood = 0;
+        int totalStone = 0, totalFood = 0, totalWood = 0;
         Tile stockpile = world.getStockpileTile();
         if (stockpile != null) {
             totalStone = stockpile.countItems(ItemType.STONE);
             totalFood = stockpile.countItems(ItemType.FOOD);
+            totalWood = stockpile.countItems(ItemType.WOOD);
         }
-        resourceLabel.setText("Stockpile  Stone: " + totalStone + "  Food: " + totalFood);
+        resourceLabel.setText("Stockpile  Stone: " + totalStone + "  Food: " + totalFood + "  Wood: " + totalWood);
 
         // Colonist list — compact single-line format
         Entity leaderEntity = playerController.getLeader();
@@ -210,6 +218,18 @@ public class GameHud {
         // Pickup message
         String pickupMsg = playerController.getPickupMessage();
         pickupLabel.setText(pickupMsg);
+
+        // Build mode indicator
+        if (playerController.getBuildModeActive()) {
+            buildModeLabel.setText("[BUILD MODE — Click to place Bed (costs 3 Wood) — B to cancel]");
+            buildModeLabel.pack();
+            buildModeLabel.setPosition(
+                    stage.getWidth() / 2f - buildModeLabel.getPrefWidth() / 2f,
+                    stage.getHeight() / 2f
+            );
+        } else {
+            buildModeLabel.setText("");
+        }
 
         stage.act(Gdx.graphics.getDeltaTime());
     }

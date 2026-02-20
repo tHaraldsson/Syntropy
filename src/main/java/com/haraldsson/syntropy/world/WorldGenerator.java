@@ -58,13 +58,17 @@ public final class WorldGenerator {
         int[] fg = findValidTile(tiles, width, height, width / 2, height / 2);
         createBuilding(ecsWorld, world, tiles, fg[0], fg[1], "FOOD_GROWER", 10f, 5, ItemType.FOOD);
 
+        // Woodcutter
+        int[] wc = findValidTile(tiles, width, height, width / 2 - 4, height / 2);
+        createBuilding(ecsWorld, world, tiles, wc[0], wc[1], "WOODCUTTER", 8f, 5, ItemType.WOOD);
+
         // Stockpile
         int[] sp = findValidTile(tiles, width, height, width - 4, height - 4);
         Tile stockpileTile = tiles[sp[0]][sp[1]];
         stockpileTile.setStockpile(true);
-        stockpileTile.addItem(new Item(ItemType.FOOD));
-        stockpileTile.addItem(new Item(ItemType.FOOD));
-        stockpileTile.addItem(new Item(ItemType.FOOD));
+        for (int i = 0; i < 5; i++) stockpileTile.addItem(new Item(ItemType.FOOD));
+        for (int i = 0; i < 5; i++) stockpileTile.addItem(new Item(ItemType.STONE));
+        for (int i = 0; i < 5; i++) stockpileTile.addItem(new Item(ItemType.WOOD));
         world.setStockpileTile(stockpileTile);
 
         // Leader (player-controlled)
@@ -107,6 +111,7 @@ public final class WorldGenerator {
         entity.add(new AgingComponent(age, 65 + rng.nextInt(20)));
         entity.add(new RoleComponent(ColonistRole.IDLE));
         entity.add(new MoodComponent());
+        entity.add(new SleepQualityComponent());
         entity.add(new WorkSettingsComponent());
         // Leader AI is disabled — player controls directly
         entity.get(AIComponent.class).aiDisabled = true;
@@ -126,6 +131,7 @@ public final class WorldGenerator {
         entity.add(new AgingComponent(age, 60 + rng.nextInt(25)));
         entity.add(new RoleComponent(role));
         entity.add(new MoodComponent());
+        entity.add(new SleepQualityComponent());
         WorkSettingsComponent ws = new WorkSettingsComponent();
         ws.setPriority(role, 3); // default priority for assigned role
         ws.setPriority(ColonistRole.HAULER, 2); // everyone hauls at low priority

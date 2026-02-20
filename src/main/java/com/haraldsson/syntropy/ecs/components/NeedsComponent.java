@@ -36,6 +36,7 @@ public class NeedsComponent implements Component {
 
     public void eat() { hunger = Math.min(1f, hunger + EAT_AMOUNT); }
     public void rest() { energy = Math.min(1f, energy + REST_AMOUNT); }
+    public void restPartial(float amount) { energy = Math.min(1f, energy + amount); }
     public void heal(float amount) { health = Math.min(1f, health + amount); }
     public void damage(float amount) { health = Math.max(0f, health - amount); }
 }

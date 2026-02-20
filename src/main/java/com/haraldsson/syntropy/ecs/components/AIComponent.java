@@ -2,6 +2,7 @@ package com.haraldsson.syntropy.ecs.components;
 
 import com.haraldsson.syntropy.ecs.Component;
 import com.haraldsson.syntropy.entities.TaskType;
+import com.haraldsson.syntropy.world.World;
 
 public class AIComponent implements Component {
     public TaskType taskType = TaskType.IDLE;
@@ -31,6 +32,10 @@ public class AIComponent implements Component {
     }
 
     public void moveTowardTarget(PositionComponent pos, float delta, float speed) {
+        moveTowardTarget(pos, delta, speed, null);
+    }
+
+    public void moveTowardTarget(PositionComponent pos, float delta, float speed, World world) {
         if (targetX < 0 || targetY < 0) return;
         float tcx = targetX + 0.5f;
         float tcy = targetY + 0.5f;
@@ -43,8 +48,13 @@ public class AIComponent implements Component {
             return;
         }
         float step = speed * delta;
-        pos.x += (dx / dist) * step;
-        pos.y += (dy / dist) * step;
+        float nx = pos.x + (dx / dist) * step;
+        float ny = pos.y + (dy / dist) * step;
+        if (world != null && !world.isPassable((int) nx, (int) ny)) {
+            return; // blocked by impassable terrain
+        }
+        pos.x = nx;
+        pos.y = ny;
     }
 
     public boolean shouldPickNewWanderTarget(float delta) {

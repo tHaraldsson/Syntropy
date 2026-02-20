@@ -25,12 +25,22 @@ public class ThinkNode_Wander extends ThinkNode {
         if (ai == null || pos == null) return false;
 
         if (ai.shouldPickNewWanderTarget(delta) || ai.taskType == TaskType.IDLE) {
-            int tx = (int) (Math.random() * world.getWidth());
-            int ty = (int) (Math.random() * world.getHeight());
-            ai.setTask(TaskType.WANDER, tx, ty);
+            int tx, ty;
+            int attempts = 0;
+            do {
+                tx = (int) (Math.random() * world.getWidth());
+                ty = (int) (Math.random() * world.getHeight());
+                attempts++;
+            } while (!world.isPassable(tx, ty) && attempts < 20);
+            // If no passable tile found, stay in place
+            if (world.isPassable(tx, ty)) {
+                ai.setTask(TaskType.WANDER, tx, ty);
+            } else {
+                ai.clearTask();
+            }
             ai.resetWanderCooldown(2f + (float) Math.random() * 2f);
         }
-        ai.moveTowardTarget(pos, delta, MOVE_SPEED);
+        ai.moveTowardTarget(pos, delta, MOVE_SPEED, world);
         if (ai.isAtTarget(pos.x, pos.y)) {
             ai.clearTask();
         }

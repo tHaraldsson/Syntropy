@@ -111,6 +111,7 @@ public final class WorldGenerator {
         entity.add(new AgingComponent(age, 65 + rng.nextInt(20)));
         entity.add(new RoleComponent(ColonistRole.IDLE));
         entity.add(new MoodComponent());
+        entity.add(new SleepQualityComponent());
         entity.add(new WorkSettingsComponent());
         entity.add(new SleepQualityComponent());
         // Leader AI is disabled — player controls directly
@@ -131,6 +132,7 @@ public final class WorldGenerator {
         entity.add(new AgingComponent(age, 60 + rng.nextInt(25)));
         entity.add(new RoleComponent(role));
         entity.add(new MoodComponent());
+        entity.add(new SleepQualityComponent());
         WorkSettingsComponent ws = new WorkSettingsComponent();
         ws.setPriority(role, 3); // default priority for assigned role
         ws.setPriority(ColonistRole.HAULER, 2); // everyone hauls at low priority

@@ -20,11 +20,11 @@ public class ThinkNode_Rest extends ThinkNode {
         NeedsComponent needs = entity.get(NeedsComponent.class);
         AIComponent ai = entity.get(AIComponent.class);
         if (needs == null) return 0f;
-        if (ai != null && ai.taskType == TaskType.RESTING) return 80f; // keep resting
+        if (ai != null && ai.taskType == TaskType.RESTING) return 90f; // keep resting
         return switch (needs.getEnergyCategory()) {
-            case COLLAPSED -> 80f;
-            case EXHAUSTED -> 60f;
-            case TIRED -> 15f;
+            case COLLAPSED -> 95f;
+            case EXHAUSTED -> 75f;
+            case TIRED -> 20f;
             case RESTED -> 0f;
         };
     }

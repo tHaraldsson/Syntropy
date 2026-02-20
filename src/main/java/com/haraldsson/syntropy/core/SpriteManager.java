@@ -457,79 +457,72 @@ public class SpriteManager {
     // ── Colonists ──
 
     private void generateColonistTextures() {
-        generateColonist("colonist_alive", 0.85f, 0.55f, 0.2f, false, false);
-        generateColonist("colonist_possessed", 0.9f, 0.2f, 0.15f, false, true);
-        generateColonist("colonist_dead", 0.25f, 0.15f, 0.12f, true, false);
+        generateColonistAlive();
+        generateColonistLeader();
+        generateColonistDead();
     }
 
-    private void generateColonist(String key, float bodyR, float bodyG, float bodyB, boolean dead, boolean possessed) {
-        int s = T - 16;
-        Pixmap pm = new Pixmap(s, s, Pixmap.Format.RGBA8888);
-
-        if (dead) {
-            // Fallen body — horizontal oval
-            pm.setColor(bodyR, bodyG, bodyB, 1f);
-            pm.fillRectangle(2, s / 2, s - 4, s / 3);
-            pm.setColor(bodyR * 0.7f, bodyG * 0.7f, bodyB * 0.7f, 1f);
-            pm.drawRectangle(2, s / 2, s - 4, s / 3);
-            // X eyes
-            pm.setColor(0.5f, 0.15f, 0.1f, 1f);
-            int ey = s / 2 + 3;
-            pm.drawLine(4, ey, 7, ey + 3);
-            pm.drawLine(7, ey, 4, ey + 3);
-            pm.drawLine(s - 8, ey, s - 5, ey + 3);
-            pm.drawLine(s - 5, ey, s - 8, ey + 3);
-        } else {
-            // Shadow
-            pm.setColor(0f, 0f, 0f, 0.2f);
-            pm.fillCircle(s / 2 + 1, s - 3, s / 3);
-
-            // Body (torso)
-            float bDark = 0.75f;
-            pm.setColor(bodyR * bDark, bodyG * bDark, bodyB * bDark, 1f);
-            pm.fillRectangle(s / 4, s / 3, s / 2, s / 2);
-            pm.setColor(bodyR, bodyG, bodyB, 1f);
-            pm.fillRectangle(s / 4 + 1, s / 3 + 1, s / 2 - 2, s / 2 - 2);
-
-            // Belt detail
-            pm.setColor(bodyR * 0.5f, bodyG * 0.5f, bodyB * 0.5f, 1f);
-            pm.fillRectangle(s / 4, s / 2 + 2, s / 2, 2);
-
-            // Head (circle)
-            float headR = 0.75f, headG = 0.6f, headB = 0.45f;
-            int headY = s / 4;
-            pm.setColor(headR, headG, headB, 1f);
-            pm.fillCircle(s / 2, headY, s / 5);
-            pm.setColor(headR * 0.85f, headG * 0.85f, headB * 0.85f, 1f);
-            pm.drawCircle(s / 2, headY, s / 5);
-
-            // Eyes
-            pm.setColor(0.15f, 0.12f, 0.1f, 1f);
-            pm.fillRectangle(s / 2 - 3, headY - 1, 2, 2);
-            pm.fillRectangle(s / 2 + 2, headY - 1, 2, 2);
-
-            // Legs
-            pm.setColor(bodyR * 0.6f, bodyG * 0.6f, bodyB * 0.6f, 1f);
-            pm.fillRectangle(s / 4 + 2, s * 3 / 4, 3, s / 4 - 2);
-            pm.fillRectangle(s * 3 / 4 - 5, s * 3 / 4, 3, s / 4 - 2);
-
-            // Boots
-            pm.setColor(0.2f, 0.18f, 0.15f, 1f);
-            pm.fillRectangle(s / 4 + 1, s - 4, 5, 3);
-            pm.fillRectangle(s * 3 / 4 - 6, s - 4, 5, 3);
-
-            // Possessed glow border
-            if (possessed) {
-                pm.setColor(1f, 0.3f, 0.2f, 0.8f);
-                pm.drawRectangle(0, 0, s, s);
-                pm.drawRectangle(1, 1, s - 2, s - 2);
-                // Pulsing indicator on head
-                pm.setColor(1f, 0.4f, 0.3f, 1f);
-                pm.fillCircle(s / 2, headY - s / 5 - 2, 2);
+    /** Draws a filled circle with a border ring into pm. */
+    private void drawCircleColonist(Pixmap pm, int s, float fillR, float fillG, float fillB,
+                                    float borderR, float borderG, float borderB) {
+        for (int y = 0; y < s; y++) {
+            for (int x = 0; x < s; x++) {
+                float dx = x - s / 2f, dy = y - s / 2f;
+                float r2 = dx * dx + dy * dy;
+                float outerR = s / 2f - 1;
+                float innerR = s / 2f - 2.5f;
+                if (r2 < innerR * innerR) {
+                    pm.setColor(fillR, fillG, fillB, 1f);
+                    pm.drawPixel(x, y);
+                } else if (r2 < outerR * outerR) {
+                    pm.setColor(borderR, borderG, borderB, 1f);
+                    pm.drawPixel(x, y);
+                }
             }
         }
+    }
 
-        textures.put(key, new Texture(pm));
+    private void generateColonistAlive() {
+        int s = T - 16;
+        Pixmap pm = new Pixmap(s, s, Pixmap.Format.RGBA8888);
+        drawCircleColonist(pm, s, 0.3f, 0.5f, 0.9f, 0.2f, 0.35f, 0.7f);
+        textures.put("colonist_alive", new Texture(pm));
+        pm.dispose();
+    }
+
+    private void generateColonistLeader() {
+        int s = T - 16;
+        Pixmap pm = new Pixmap(s, s, Pixmap.Format.RGBA8888);
+        drawCircleColonist(pm, s, 0.95f, 0.8f, 0.1f, 0.7f, 0.55f, 0.0f);
+        // Small white dot on top to mark as leader
+        pm.setColor(1f, 1f, 1f, 1f);
+        pm.fillRectangle(s / 2 - 1, 2, 3, 3);
+        textures.put("colonist_possessed", new Texture(pm));
+        pm.dispose();
+    }
+
+    private void generateColonistDead() {
+        int s = T - 16;
+        Pixmap pm = new Pixmap(s, s, Pixmap.Format.RGBA8888);
+        // Dark grey background rectangle
+        pm.setColor(0.2f, 0.2f, 0.2f, 1f);
+        pm.fillRectangle(0, 0, s, s);
+        // X shape in dark red/brown
+        pm.setColor(0.45f, 0.15f, 0.1f, 1f);
+        int margin = 3;
+        for (int i = 0; i < s - margin * 2; i++) {
+            int j = i + margin;
+            int k = s - 1 - i - margin;
+            if (j >= 0 && j < s && k >= 0 && k < s) {
+                pm.drawPixel(j, j); // diagonal top-left to bottom-right
+                pm.drawPixel(j + 1, j);
+                pm.drawPixel(j, k); // diagonal top-right to bottom-left
+                pm.drawPixel(j + 1, k);
+            }
+        }
+        pm.setColor(0.3f, 0.1f, 0.08f, 1f);
+        pm.drawRectangle(0, 0, s, s);
+        textures.put("colonist_dead", new Texture(pm));
         pm.dispose();
     }
 

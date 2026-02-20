@@ -5,6 +5,8 @@ import com.haraldsson.syntropy.ecs.Entity;
 import com.haraldsson.syntropy.ecs.GameSystem;
 import com.haraldsson.syntropy.ecs.components.HealthComponent;
 import com.haraldsson.syntropy.ecs.components.NeedsComponent;
+import com.haraldsson.syntropy.entities.EnergyCategory;
+import com.haraldsson.syntropy.entities.HungerCategory;
 import com.haraldsson.syntropy.world.World;
 
 /**
@@ -22,13 +24,13 @@ public class NeedsSystem extends GameSystem {
             needs.hunger = Math.max(0f, needs.hunger - NeedsComponent.HUNGER_DECAY * delta);
             needs.energy = Math.max(0f, needs.energy - NeedsComponent.ENERGY_DECAY * delta);
 
-            // Starvation damage
-            if (needs.hunger <= 0f) {
-                needs.damage(0.05f * delta);
+            // Starvation damage — only when STARVING, at half the original rate
+            if (needs.getHungerCategory() == HungerCategory.STARVING) {
+                needs.damage(0.025f * delta);
             }
 
             // Health regen when well-fed and rested
-            if (needs.hunger > 0.5f && needs.energy > 0.5f) {
+            if (needs.getHungerCategory() == HungerCategory.FED && needs.getEnergyCategory() == EnergyCategory.RESTED) {
                 needs.heal(NeedsComponent.HEALTH_REGEN * delta);
             }
 

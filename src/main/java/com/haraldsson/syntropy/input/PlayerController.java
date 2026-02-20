@@ -29,7 +29,7 @@ public class PlayerController {
     private final Viewport viewport;
     private final int tileSize;
 
-    private Entity leader; // cached reference
+    private Entity leader;
     private String pickupMessage = "";
     private float pickupMessageTimer;
     private boolean buildModeActive = false;
@@ -43,7 +43,6 @@ public class PlayerController {
         findLeader();
     }
 
-    /** Find the leader entity in the ECS world */
     public void findLeader() {
         leader = null;
         for (Entity e : ecsWorld.getEntitiesWith(LeaderComponent.class)) {
@@ -55,7 +54,6 @@ public class PlayerController {
     public void update(float delta) {
         if (pickupMessageTimer > 0) pickupMessageTimer -= delta;
 
-        // If leader is dead, only allow camera pan
         if (leader != null) {
             HealthComponent health = leader.get(HealthComponent.class);
             if (health != null && health.dead) {
@@ -73,7 +71,6 @@ public class PlayerController {
 
     public Entity getLeader() { return leader; }
 
-    /** Used by GameApp to get the leader for HUD display, renamed from getPossessed */
     public Entity getPossessed() { return leader; }
 
     public boolean getBuildModeActive() { return buildModeActive; }
@@ -81,8 +78,6 @@ public class PlayerController {
     public String getPickupMessage() {
         return pickupMessageTimer > 0 ? pickupMessage : "";
     }
-
-    public boolean getBuildModeActive() { return buildModeActive; }
 
     private void handleLeaderMovement(float delta) {
         PositionComponent pos = leader.get(PositionComponent.class);
@@ -169,14 +164,11 @@ public class PlayerController {
         Tile tile = world.getTile(tileX, tileY);
         if (tile == null) return;
 
-        // Must be GRASS or DIRT
         TerrainType t = tile.getTerrainType();
         if (t != TerrainType.GRASS && t != TerrainType.DIRT) return;
 
-        // Must not already have a building or bed
         if (tile.getBuildingEntity() != null) return;
 
-        // Must have 3 wood in stockpile
         Tile stockpile = world.getStockpileTile();
         if (stockpile == null) return;
         int woodCount = stockpile.countItems(ItemType.WOOD);
@@ -185,72 +177,22 @@ public class PlayerController {
             return;
         }
 
-        // Deduct 3 wood
         for (int i = 0; i < 3; i++) {
             stockpile.takeFirstItem(ItemType.WOOD);
         }
 
-        // Place bed entity
         Entity bedEntity = ecsWorld.createEntity();
         bedEntity.add(new PositionComponent(tileX, tileY));
         bedEntity.add(new BedComponent());
         tile.setBuildingEntity(bedEntity);
 
         showPickupMessage("Bed placed!");
-        buildModeActive = false; // exit build mode after placing
+        buildModeActive = false;
     }
 
     private void showPickupMessage(String msg) {
         pickupMessage = msg;
         pickupMessageTimer = 2f;
-    }
-
-    private void handleBuildMode() {
-        if (Gdx.input.isKeyJustPressed(Input.Keys.B)) {
-            buildModeActive = !buildModeActive;
-        }
-
-        if (buildModeActive && Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
-            Vector3 worldCoords = camera.unproject(new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0));
-            int tileX = (int)(worldCoords.x / tileSize);
-            int tileY = (int)(worldCoords.y / tileSize);
-            tryPlaceBed(tileX, tileY);
-        }
-    }
-
-    private void tryPlaceBed(int tileX, int tileY) {
-        Tile tile = world.getTile(tileX, tileY);
-        if (tile == null) return;
-
-        // Must be GRASS or DIRT
-        TerrainType t = tile.getTerrainType();
-        if (t != TerrainType.GRASS && t != TerrainType.DIRT) return;
-
-        // Must not already have a building or bed
-        if (tile.getBuildingEntity() != null) return;
-
-        // Must have 3 wood in stockpile
-        Tile stockpile = world.getStockpileTile();
-        if (stockpile == null) return;
-        int woodCount = stockpile.countItems(ItemType.WOOD);
-        if (woodCount < 3) {
-            showPickupMessage("Need 3 Wood to place bed");
-            return;
-        }
-
-        // Deduct 3 wood
-        for (int i = 0; i < 3; i++) {
-            stockpile.takeFirstItem(ItemType.WOOD);
-        }
-
-        // Place bed entity
-        Entity bedEntity = ecsWorld.createEntity();
-        bedEntity.add(new PositionComponent(tileX, tileY));
-        bedEntity.add(new BedComponent());
-        tile.setBuildingEntity(bedEntity);
-
-        showPickupMessage("Bed placed!");
-        buildModeActive = false; // exit build mode after placing
     }
 
     private void updateCameraFollow() {

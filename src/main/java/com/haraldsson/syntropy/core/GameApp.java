@@ -11,19 +11,23 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
-import com.haraldsson.syntropy.entities.Colonist;
-import com.haraldsson.syntropy.entities.FoodGrower;
+import com.haraldsson.syntropy.ecs.ECSWorld;
+import com.haraldsson.syntropy.ecs.Entity;
+import com.haraldsson.syntropy.ecs.components.*;
+import com.haraldsson.syntropy.ecs.systems.AITaskSystem;
+import com.haraldsson.syntropy.ecs.systems.BuildingProductionSystem;
+import com.haraldsson.syntropy.ecs.systems.NeedsSystem;
 import com.haraldsson.syntropy.entities.Item;
 import com.haraldsson.syntropy.entities.ItemType;
-import com.haraldsson.syntropy.entities.Miner;
 import com.haraldsson.syntropy.input.PlayerController;
 import com.haraldsson.syntropy.systems.EventSystem;
 import com.haraldsson.syntropy.systems.ResearchSystem;
 import com.haraldsson.syntropy.systems.Technology;
-import com.haraldsson.syntropy.systems.TaskSystem;
 import com.haraldsson.syntropy.world.Tile;
 import com.haraldsson.syntropy.world.World;
 import com.haraldsson.syntropy.world.WorldGenerator;
+
+import java.util.List;
 
 public class GameApp extends ApplicationAdapter {
     public static final int TILE_SIZE = 48;
@@ -39,10 +43,15 @@ public class GameApp extends ApplicationAdapter {
     private BitmapFont smallFont;
 
     private World world;
+    private ECSWorld ecsWorld;
     private PlayerController playerController;
-    private TaskSystem taskSystem;
     private ResearchSystem researchSystem;
     private EventSystem eventSystem;
+
+    // ECS systems
+    private NeedsSystem needsSystem;
+    private BuildingProductionSystem buildingProductionSystem;
+    private AITaskSystem aiTaskSystem;
 
     private String statusMessage = "";
     private float statusTimer;
@@ -60,11 +69,16 @@ public class GameApp extends ApplicationAdapter {
         smallFont = new BitmapFont();
         smallFont.getData().setScale(0.7f);
 
-        world = WorldGenerator.generate(WORLD_WIDTH, WORLD_HEIGHT);
-        playerController = new PlayerController(world, camera, viewport, TILE_SIZE);
-        taskSystem = new TaskSystem();
+        WorldGenerator.GenerationResult result = WorldGenerator.generate(WORLD_WIDTH, WORLD_HEIGHT);
+        world = result.world;
+        ecsWorld = result.ecsWorld;
+
+        playerController = new PlayerController(world, ecsWorld, camera, viewport, TILE_SIZE);
         researchSystem = new ResearchSystem();
         eventSystem = new EventSystem();
+        needsSystem = new NeedsSystem();
+        buildingProductionSystem = new BuildingProductionSystem();
+        aiTaskSystem = new AITaskSystem();
 
         centerCameraOnWorld();
     }
@@ -84,10 +98,20 @@ public class GameApp extends ApplicationAdapter {
         handleResearchInput();
 
         playerController.update(delta);
-        taskSystem.update(world, delta);
+        aiTaskSystem.update(ecsWorld, world, delta);
+        needsSystem.update(ecsWorld, world, delta);
+        buildingProductionSystem.update(ecsWorld, world, delta);
         researchSystem.update(delta);
-        eventSystem.update(world, delta);
-        world.update(delta);
+        eventSystem.update(ecsWorld, world, delta);
+
+        // Clamp colonist positions
+        for (Entity e : ecsWorld.getEntitiesWith(PositionComponent.class, AIComponent.class)) {
+            PositionComponent pos = e.get(PositionComponent.class);
+            float[] xy = {pos.x, pos.y};
+            world.clampPosition(xy);
+            pos.x = xy[0];
+            pos.y = xy[1];
+        }
 
         if (statusTimer > 0) statusTimer -= delta;
 
@@ -103,30 +127,9 @@ public class GameApp extends ApplicationAdapter {
         smallFont.dispose();
     }
 
-    // ── Save / Load ──────────────────────────────────────────────────
-
     private void handleSaveLoad() {
-        if (Gdx.input.isKeyJustPressed(Input.Keys.F5)) {
-            try {
-                SaveLoadSystem.save(world, "syntropy_save.json");
-                showStatus("Game saved!");
-            } catch (Exception e) {
-                showStatus("Save failed: " + e.getMessage());
-            }
-        }
-        if (Gdx.input.isKeyJustPressed(Input.Keys.F9)) {
-            try {
-                world = SaveLoadSystem.load("syntropy_save.json");
-                playerController = new PlayerController(world, camera, viewport, TILE_SIZE);
-                taskSystem = new TaskSystem();
-                researchSystem = new ResearchSystem();
-                eventSystem = new EventSystem();
-                centerCameraOnWorld();
-                showStatus("Game loaded!");
-            } catch (Exception e) {
-                showStatus("Load failed: " + e.getMessage());
-            }
-        }
+        // Save/load temporarily disabled during ECS refactor
+        // TODO: Rewrite SaveLoadSystem for ECS
     }
 
     private void handleResearchInput() {
@@ -177,25 +180,33 @@ public class GameApp extends ApplicationAdapter {
         }
         shapeRenderer.end();
 
+        // World-space text
         spriteBatch.setProjectionMatrix(camera.combined);
         spriteBatch.begin();
-        for (Colonist colonist : world.getColonists()) {
-            float cx = colonist.getX() * TILE_SIZE;
-            float cy = colonist.getY() * TILE_SIZE;
-            if (colonist.isDead()) {
+        for (Entity e : ecsWorld.getEntitiesWith(IdentityComponent.class, PositionComponent.class, HealthComponent.class)) {
+            IdentityComponent id = e.get(IdentityComponent.class);
+            PositionComponent pos = e.get(PositionComponent.class);
+            HealthComponent health = e.get(HealthComponent.class);
+            float cx = pos.x * TILE_SIZE;
+            float cy = pos.y * TILE_SIZE;
+            if (health.dead) {
                 smallFont.setColor(Color.GRAY);
-                smallFont.draw(spriteBatch, colonist.getName() + " (dead)", cx - 4, cy + TILE_SIZE + 10);
+                smallFont.draw(spriteBatch, id.name + " (dead)", cx - 4, cy + TILE_SIZE + 10);
             } else {
                 smallFont.setColor(Color.WHITE);
-                smallFont.draw(spriteBatch, colonist.getName(), cx + 4, cy + TILE_SIZE + 10);
-                smallFont.setColor(0.7f, 0.7f, 0.7f, 1f);
-                smallFont.draw(spriteBatch, colonist.getTaskType().name(), cx + 4, cy + TILE_SIZE + 22);
+                smallFont.draw(spriteBatch, id.name, cx + 4, cy + TILE_SIZE + 10);
+                AIComponent ai = e.get(AIComponent.class);
+                if (ai != null) {
+                    smallFont.setColor(0.7f, 0.7f, 0.7f, 1f);
+                    smallFont.draw(spriteBatch, ai.taskType.name(), cx + 4, cy + TILE_SIZE + 22);
+                }
             }
         }
-        Colonist possessed = playerController.getPossessed();
+        Entity possessed = playerController.getPossessed();
         if (possessed != null) {
+            PositionComponent pp = possessed.get(PositionComponent.class);
             font.setColor(Color.RED);
-            font.draw(spriteBatch, "[P]", possessed.getX() * TILE_SIZE + 10, possessed.getY() * TILE_SIZE + TILE_SIZE + 34);
+            font.draw(spriteBatch, "[P]", pp.x * TILE_SIZE + 10, pp.y * TILE_SIZE + TILE_SIZE + 34);
             font.setColor(Color.WHITE);
         }
         spriteBatch.end();
@@ -209,7 +220,6 @@ public class GameApp extends ApplicationAdapter {
                 Tile tile = world.getTile(x, y);
                 shapeRenderer.setColor(tile.getTerrainType().r, tile.getTerrainType().g, tile.getTerrainType().b, 1f);
                 shapeRenderer.rect(px, py, TILE_SIZE, TILE_SIZE);
-
                 if (tile.isStockpile()) {
                     shapeRenderer.setColor(0.12f, 0.2f, 0.4f, 1f);
                     shapeRenderer.rect(px + 4, py + 4, TILE_SIZE - 8, TILE_SIZE - 8);
@@ -219,25 +229,26 @@ public class GameApp extends ApplicationAdapter {
     }
 
     private void renderBuildings() {
-        for (Miner miner : world.getMiners()) {
-            float px = miner.getX() * TILE_SIZE;
-            float py = miner.getY() * TILE_SIZE;
-            shapeRenderer.setColor(0.35f, 0.35f, 0.35f, 1f);
-            shapeRenderer.rect(px + 6, py + 6, TILE_SIZE - 12, TILE_SIZE - 12);
-            int count = Math.min(miner.getOutputCount(), 5);
-            for (int i = 0; i < count; i++) {
-                shapeRenderer.setColor(0.55f, 0.55f, 0.55f, 1f);
-                shapeRenderer.rect(px + 10 + i * 6, py + 10, 4, 4);
+        for (Entity e : ecsWorld.getEntitiesWith(BuildingComponent.class, PositionComponent.class)) {
+            BuildingComponent bc = e.get(BuildingComponent.class);
+            PositionComponent pos = e.get(PositionComponent.class);
+            float px = pos.x * TILE_SIZE;
+            float py = pos.y * TILE_SIZE;
+
+            if ("MINER".equals(bc.buildingType)) {
+                shapeRenderer.setColor(0.35f, 0.35f, 0.35f, 1f);
+            } else {
+                shapeRenderer.setColor(0.25f, 0.45f, 0.2f, 1f);
             }
-        }
-        for (FoodGrower grower : world.getFoodGrowers()) {
-            float px = grower.getX() * TILE_SIZE;
-            float py = grower.getY() * TILE_SIZE;
-            shapeRenderer.setColor(0.25f, 0.45f, 0.2f, 1f);
             shapeRenderer.rect(px + 6, py + 6, TILE_SIZE - 12, TILE_SIZE - 12);
-            int count = Math.min(grower.getOutputCount(), 5);
+
+            int count = Math.min(bc.getOutputCount(), 5);
             for (int i = 0; i < count; i++) {
-                shapeRenderer.setColor(0.85f, 0.75f, 0.25f, 1f);
+                if ("MINER".equals(bc.buildingType)) {
+                    shapeRenderer.setColor(0.55f, 0.55f, 0.55f, 1f);
+                } else {
+                    shapeRenderer.setColor(0.85f, 0.75f, 0.25f, 1f);
+                }
                 shapeRenderer.rect(px + 10 + i * 6, py + 10, 4, 4);
             }
         }
@@ -264,25 +275,31 @@ public class GameApp extends ApplicationAdapter {
     }
 
     private void renderColonists() {
-        for (Colonist colonist : world.getColonists()) {
-            float cx = colonist.getX() * TILE_SIZE;
-            float cy = colonist.getY() * TILE_SIZE;
+        for (Entity e : ecsWorld.getEntitiesWith(PositionComponent.class, HealthComponent.class, NeedsComponent.class)) {
+            PositionComponent pos = e.get(PositionComponent.class);
+            HealthComponent health = e.get(HealthComponent.class);
+            NeedsComponent needs = e.get(NeedsComponent.class);
+            AIComponent ai = e.get(AIComponent.class);
+            InventoryComponent inv = e.get(InventoryComponent.class);
 
-            if (colonist.isDead()) {
+            float cx = pos.x * TILE_SIZE;
+            float cy = pos.y * TILE_SIZE;
+
+            if (health.dead) {
                 shapeRenderer.setColor(0.3f, 0.1f, 0.1f, 1f);
                 shapeRenderer.rect(cx + 14, cy + 14, TILE_SIZE - 28, TILE_SIZE - 28);
                 continue;
             }
 
-            if (colonist.isAiDisabled()) {
+            if (ai != null && ai.aiDisabled) {
                 shapeRenderer.setColor(0.9f, 0.25f, 0.25f, 1f);
             } else {
                 shapeRenderer.setColor(0.95f, 0.6f, 0.2f, 1f);
             }
             shapeRenderer.rect(cx + 12, cy + 12, TILE_SIZE - 24, TILE_SIZE - 24);
 
-            if (colonist.getCarriedItem() != null) {
-                if (colonist.getCarriedItem().getType() == ItemType.STONE) {
+            if (inv != null && inv.carriedItem != null) {
+                if (inv.carriedItem.getType() == ItemType.STONE) {
                     shapeRenderer.setColor(0.6f, 0.6f, 0.6f, 1f);
                 } else {
                     shapeRenderer.setColor(0.85f, 0.75f, 0.25f, 1f);
@@ -292,9 +309,9 @@ public class GameApp extends ApplicationAdapter {
 
             float barY = cy + TILE_SIZE - 6;
             float barWidth = TILE_SIZE - 16;
-            drawBar(cx + 8, barY, barWidth, colonist.getHunger() / 100f, 0.2f, 0.8f, 0.3f);
-            drawBar(cx + 8, barY - 5, barWidth, colonist.getEnergy() / 100f, 0.3f, 0.5f, 0.9f);
-            drawBar(cx + 8, barY - 10, barWidth, colonist.getMood() / 100f, 0.9f, 0.8f, 0.2f);
+            drawBar(cx + 8, barY, barWidth, needs.hunger / 100f, 0.2f, 0.8f, 0.3f);
+            drawBar(cx + 8, barY - 5, barWidth, needs.energy / 100f, 0.3f, 0.5f, 0.9f);
+            drawBar(cx + 8, barY - 10, barWidth, needs.mood / 100f, 0.9f, 0.8f, 0.2f);
         }
     }
 
@@ -326,14 +343,14 @@ public class GameApp extends ApplicationAdapter {
         font.draw(spriteBatch, "Stockpile  Stone: " + totalStone + "  Food: " + totalFood, 10, screenH - 10);
 
         float yOffset = screenH - 30;
-        for (int i = 0; i < world.getMiners().size(); i++) {
-            Miner m = world.getMiners().get(i);
-            font.draw(spriteBatch, "Miner " + (i + 1) + " output: " + m.getOutputCount(), 10, yOffset);
-            yOffset -= 18;
-        }
-        for (int i = 0; i < world.getFoodGrowers().size(); i++) {
-            FoodGrower fg = world.getFoodGrowers().get(i);
-            font.draw(spriteBatch, "FoodGrower " + (i + 1) + " output: " + fg.getOutputCount(), 10, yOffset);
+        int minerIdx = 1, growerIdx = 1;
+        for (Entity e : ecsWorld.getEntitiesWith(BuildingComponent.class)) {
+            BuildingComponent bc = e.get(BuildingComponent.class);
+            if ("MINER".equals(bc.buildingType)) {
+                font.draw(spriteBatch, "Miner " + minerIdx++ + " output: " + bc.getOutputCount(), 10, yOffset);
+            } else {
+                font.draw(spriteBatch, "FoodGrower " + growerIdx++ + " output: " + bc.getOutputCount(), 10, yOffset);
+            }
             yOffset -= 18;
         }
 
@@ -342,41 +359,47 @@ public class GameApp extends ApplicationAdapter {
         font.setColor(Color.LIGHT_GRAY);
         font.draw(spriteBatch, "-- Colonists --", rightX, listY);
         listY -= 18;
-        for (Colonist c : world.getColonists()) {
-            if (c.isDead()) {
+        Entity possessedEntity = playerController.getPossessed();
+        for (Entity e : ecsWorld.getEntitiesWith(IdentityComponent.class, NeedsComponent.class, HealthComponent.class)) {
+            IdentityComponent id = e.get(IdentityComponent.class);
+            HealthComponent health = e.get(HealthComponent.class);
+            NeedsComponent needs = e.get(NeedsComponent.class);
+            AIComponent ai = e.get(AIComponent.class);
+            if (health.dead) {
                 font.setColor(Color.GRAY);
-                font.draw(spriteBatch, c.getName() + " (DEAD)", rightX, listY);
+                font.draw(spriteBatch, id.name + " (DEAD)", rightX, listY);
             } else {
-                boolean isPossessed = c == playerController.getPossessed();
+                boolean isPossessed = e == possessedEntity;
                 font.setColor(isPossessed ? Color.RED : Color.WHITE);
-                String status = c.getName() + " H:" + (int) c.getHunger()
-                        + " E:" + (int) c.getEnergy()
-                        + " M:" + (int) c.getMood();
+                String status = id.name + " H:" + (int) needs.hunger
+                        + " E:" + (int) needs.energy
+                        + " M:" + (int) needs.mood;
                 font.draw(spriteBatch, status, rightX, listY);
-                listY -= 14;
-                smallFont.setColor(0.7f, 0.7f, 0.7f, 1f);
-                smallFont.draw(spriteBatch, "  Task: " + c.getTaskType().name(), rightX, listY);
+                if (ai != null) {
+                    listY -= 14;
+                    smallFont.setColor(0.7f, 0.7f, 0.7f, 1f);
+                    smallFont.draw(spriteBatch, "  Task: " + ai.taskType.name(), rightX, listY);
+                }
             }
             listY -= 18;
         }
 
         smallFont.setColor(0.6f, 0.6f, 0.6f, 1f);
-        smallFont.draw(spriteBatch, "[DblClick] Possess  [WASD] Move/Pan  [E] Pickup/Drop  [R] Research  [Scroll] Zoom  [F5] Save  [F9] Load", 10, 20);
+        smallFont.draw(spriteBatch, "[DblClick] Possess  [WASD] Move/Pan  [E] Pickup/Drop  [R] Research  [Scroll] Zoom", 10, 20);
 
-        Colonist possessed = playerController.getPossessed();
-        if (possessed != null) {
+        if (possessedEntity != null) {
+            IdentityComponent pid = possessedEntity.get(IdentityComponent.class);
             font.setColor(Color.RED);
-            font.draw(spriteBatch, "POSSESSING: " + possessed.getName(), 10, screenH - 80);
+            font.draw(spriteBatch, "POSSESSING: " + (pid != null ? pid.name : "???"), 10, screenH - 80);
             font.setColor(Color.WHITE);
         }
 
-        // Research info
         Technology currentTech = researchSystem.getCurrentResearch();
         if (currentTech != null) {
             float researchY = screenH - 100;
             if (currentTech.isUnlocked()) {
                 font.setColor(Color.GREEN);
-                font.draw(spriteBatch, "Researched: " + currentTech.getName() + " ✓", 10, researchY);
+                font.draw(spriteBatch, "Researched: " + currentTech.getName() + " done", 10, researchY);
             } else {
                 font.setColor(0.6f, 0.8f, 1f, 1f);
                 int pct = (int) (currentTech.getProgressRatio() * 100);
@@ -385,8 +408,7 @@ public class GameApp extends ApplicationAdapter {
             font.setColor(Color.WHITE);
         }
 
-        // Event log (bottom-right)
-        java.util.List<String> events = eventSystem.getEventLog();
+        List<String> events = eventSystem.getEventLog();
         float eventY = 60;
         smallFont.setColor(0.9f, 0.7f, 0.3f, 1f);
         for (int i = events.size() - 1; i >= 0 && i >= events.size() - 3; i--) {
@@ -394,7 +416,6 @@ public class GameApp extends ApplicationAdapter {
             eventY += 14;
         }
 
-        // Pickup message
         String pickupMsg = playerController.getPickupMessage();
         if (!pickupMsg.isEmpty()) {
             font.setColor(Color.CYAN);
@@ -402,7 +423,6 @@ public class GameApp extends ApplicationAdapter {
             font.setColor(Color.WHITE);
         }
 
-        // Status message (save/load feedback)
         if (statusTimer > 0) {
             font.setColor(Color.YELLOW);
             font.draw(spriteBatch, statusMessage, screenW / 2f - 60, screenH / 2f);

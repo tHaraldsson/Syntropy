@@ -1,15 +1,18 @@
 package com.haraldsson.syntropy.systems;
 
-import com.haraldsson.syntropy.entities.Colonist;
+import com.haraldsson.syntropy.ecs.ECSWorld;
+import com.haraldsson.syntropy.ecs.Entity;
+import com.haraldsson.syntropy.ecs.components.HealthComponent;
+import com.haraldsson.syntropy.ecs.components.IdentityComponent;
+import com.haraldsson.syntropy.ecs.components.NeedsComponent;
+import com.haraldsson.syntropy.entities.Item;
+import com.haraldsson.syntropy.entities.ItemType;
 import com.haraldsson.syntropy.world.World;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
-/**
- * Periodically triggers random events that affect colonists or the colony.
- */
 public class EventSystem {
     private static final float MIN_INTERVAL = 30f;
     private static final float MAX_INTERVAL = 60f;
@@ -23,25 +26,25 @@ public class EventSystem {
         nextEventAt = randomInterval();
     }
 
-    public void update(World world, float delta) {
+    public void update(ECSWorld ecsWorld, World world, float delta) {
         timer += delta;
         if (timer >= nextEventAt) {
             timer = 0f;
             nextEventAt = randomInterval();
-            triggerRandomEvent(world);
+            triggerRandomEvent(ecsWorld, world);
         }
     }
 
-    private void triggerRandomEvent(World world) {
-        List<Colonist> alive = new ArrayList<>();
-        for (Colonist c : world.getColonists()) {
-            if (!c.isDead()) alive.add(c);
+    private void triggerRandomEvent(ECSWorld ecsWorld, World world) {
+        List<Entity> alive = new ArrayList<>();
+        for (Entity e : ecsWorld.getEntitiesWith(NeedsComponent.class, HealthComponent.class)) {
+            if (!e.get(HealthComponent.class).dead) alive.add(e);
         }
         if (alive.isEmpty()) return;
 
         int roll = random.nextInt(5);
         switch (roll) {
-            case 0: eventFoodBlessing(world, alive); break;
+            case 0: eventFoodBlessing(world); break;
             case 1: eventHeatWave(alive); break;
             case 2: eventMoralBoost(alive); break;
             case 3: eventFoodSpoilage(world); break;
@@ -49,62 +52,57 @@ public class EventSystem {
         }
     }
 
-    private void eventFoodBlessing(World world, List<Colonist> alive) {
+    private void eventFoodBlessing(World world) {
         if (world.getStockpileTile() != null) {
             for (int i = 0; i < 3; i++) {
-                world.getStockpileTile().addItem(
-                        new com.haraldsson.syntropy.entities.Item(
-                                com.haraldsson.syntropy.entities.ItemType.FOOD));
+                world.getStockpileTile().addItem(new Item(ItemType.FOOD));
             }
         }
         log("EVENT: Bountiful harvest! 3 food added to stockpile.");
     }
 
-    private void eventHeatWave(List<Colonist> alive) {
-        for (Colonist c : alive) {
-            c.setHunger(Math.max(0, c.getHunger() - 15f));
+    private void eventHeatWave(List<Entity> alive) {
+        for (Entity e : alive) {
+            NeedsComponent n = e.get(NeedsComponent.class);
+            n.hunger = Math.max(0, n.hunger - 15f);
         }
         log("EVENT: Heat wave! All colonists lost 15 hunger.");
     }
 
-    private void eventMoralBoost(List<Colonist> alive) {
-        for (Colonist c : alive) {
-            c.setMood(Math.min(100, c.getMood() + 20f));
+    private void eventMoralBoost(List<Entity> alive) {
+        for (Entity e : alive) {
+            NeedsComponent n = e.get(NeedsComponent.class);
+            n.mood = Math.min(100, n.mood + 20f);
         }
         log("EVENT: Beautiful sunset. All colonists gained 20 mood.");
     }
 
     private void eventFoodSpoilage(World world) {
         if (world.getStockpileTile() != null) {
-            world.getStockpileTile().takeFirstItem(
-                    com.haraldsson.syntropy.entities.ItemType.FOOD);
+            world.getStockpileTile().takeFirstItem(ItemType.FOOD);
         }
         log("EVENT: Food spoilage! 1 food lost from stockpile.");
     }
 
-    private void eventExhaustion(List<Colonist> alive) {
-        Colonist target = alive.get(random.nextInt(alive.size()));
-        target.setEnergy(Math.max(0, target.getEnergy() - 25f));
-        log("EVENT: " + target.getName() + " feels exhausted! Lost 25 energy.");
+    private void eventExhaustion(List<Entity> alive) {
+        Entity target = alive.get(random.nextInt(alive.size()));
+        NeedsComponent n = target.get(NeedsComponent.class);
+        n.energy = Math.max(0, n.energy - 25f);
+        IdentityComponent id = target.get(IdentityComponent.class);
+        String name = id != null ? id.name : "A colonist";
+        log("EVENT: " + name + " feels exhausted! Lost 25 energy.");
     }
 
     private void log(String message) {
         eventLog.add(message);
-        if (eventLog.size() > 5) {
-            eventLog.remove(0);
-        }
+        if (eventLog.size() > 5) eventLog.remove(0);
     }
 
     public List<String> getEventLog() {
         return eventLog;
     }
 
-    public String getLatestEvent() {
-        return eventLog.isEmpty() ? "" : eventLog.get(eventLog.size() - 1);
-    }
-
     private float randomInterval() {
         return MIN_INTERVAL + random.nextFloat() * (MAX_INTERVAL - MIN_INTERVAL);
     }
 }
-

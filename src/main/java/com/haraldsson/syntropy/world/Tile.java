@@ -1,6 +1,6 @@
 package com.haraldsson.syntropy.world;
 
-import com.haraldsson.syntropy.entities.Building;
+import com.haraldsson.syntropy.ecs.Entity;
 import com.haraldsson.syntropy.entities.Item;
 import com.haraldsson.syntropy.entities.ItemType;
 
@@ -11,7 +11,7 @@ public class Tile {
     private final int x;
     private final int y;
     private TerrainType terrainType;
-    private Building building;
+    private Entity buildingEntity;
     private boolean stockpile;
     private final List<Item> groundItems = new ArrayList<>();
 
@@ -37,12 +37,12 @@ public class Tile {
         this.terrainType = terrainType;
     }
 
-    public Building getBuilding() {
-        return building;
+    public Entity getBuildingEntity() {
+        return buildingEntity;
     }
 
-    public void setBuilding(Building building) {
-        this.building = building;
+    public void setBuildingEntity(Entity buildingEntity) {
+        this.buildingEntity = buildingEntity;
     }
 
     public boolean isStockpile() {

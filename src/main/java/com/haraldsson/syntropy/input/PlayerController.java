@@ -7,11 +7,10 @@ import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.utils.viewport.Viewport;
-import com.haraldsson.syntropy.entities.Building;
-import com.haraldsson.syntropy.entities.Colonist;
-import com.haraldsson.syntropy.entities.FoodGrower;
+import com.haraldsson.syntropy.ecs.ECSWorld;
+import com.haraldsson.syntropy.ecs.Entity;
+import com.haraldsson.syntropy.ecs.components.*;
 import com.haraldsson.syntropy.entities.Item;
-import com.haraldsson.syntropy.entities.Miner;
 import com.haraldsson.syntropy.world.Tile;
 import com.haraldsson.syntropy.world.World;
 
@@ -24,11 +23,12 @@ public class PlayerController {
     private static final float DOUBLE_CLICK_TIME = 0.35f;
 
     private final World world;
+    private final ECSWorld ecsWorld;
     private final OrthographicCamera camera;
     private final Viewport viewport;
     private final int tileSize;
 
-    private Colonist possessed;
+    private Entity possessed;
     private boolean scrollListenerAdded;
 
     private float lastClickTime;
@@ -38,8 +38,9 @@ public class PlayerController {
     private String pickupMessage = "";
     private float pickupMessageTimer;
 
-    public PlayerController(World world, OrthographicCamera camera, Viewport viewport, int tileSize) {
+    public PlayerController(World world, ECSWorld ecsWorld, OrthographicCamera camera, Viewport viewport, int tileSize) {
         this.world = world;
+        this.ecsWorld = ecsWorld;
         this.camera = camera;
         this.viewport = viewport;
         this.tileSize = tileSize;
@@ -60,9 +61,13 @@ public class PlayerController {
         if (pickupMessageTimer > 0) pickupMessageTimer -= delta;
 
         // Auto-unpossess if colonist dies
-        if (possessed != null && possessed.isDead()) {
-            possessed.setAiDisabled(false);
-            possessed = null;
+        if (possessed != null) {
+            HealthComponent health = possessed.get(HealthComponent.class);
+            if (health != null && health.dead) {
+                AIComponent ai = possessed.get(AIComponent.class);
+                if (ai != null) ai.aiDisabled = false;
+                possessed = null;
+            }
         }
 
         handleDoubleClickPossession();
@@ -76,7 +81,7 @@ public class PlayerController {
         }
     }
 
-    public Colonist getPossessed() {
+    public Entity getPossessed() {
         return possessed;
     }
 
@@ -85,9 +90,7 @@ public class PlayerController {
     }
 
     private void handleDoubleClickPossession() {
-        if (!Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
-            return;
-        }
+        if (!Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) return;
 
         float now = System.nanoTime() / 1_000_000_000f;
         float mx = Gdx.input.getX();
@@ -102,82 +105,76 @@ public class PlayerController {
         lastClickX = mx;
         lastClickY = my;
 
-        if (!isDoubleClick) {
-            return;
-        }
+        if (!isDoubleClick) return;
 
-        // Double-click detected — toggle possession
+        // Double-click: toggle possession
         if (possessed != null) {
-            possessed.setAiDisabled(false);
-            possessed.clearTask();
+            AIComponent ai = possessed.get(AIComponent.class);
+            if (ai != null) { ai.aiDisabled = false; ai.clearTask(); }
             possessed = null;
             return;
         }
 
         Vector2 cursorWorld = viewport.unproject(new Vector2(mx, my));
         float bestDist = Float.MAX_VALUE;
-        Colonist nearest = null;
-        for (Colonist colonist : world.getColonists()) {
-            if (colonist.isDead()) continue;
-            float cdx = colonist.getX() - (cursorWorld.x / tileSize);
-            float cdy = colonist.getY() - (cursorWorld.y / tileSize);
+        Entity nearest = null;
+        for (Entity e : ecsWorld.getEntitiesWith(PositionComponent.class, HealthComponent.class, AIComponent.class)) {
+            HealthComponent health = e.get(HealthComponent.class);
+            if (health.dead) continue;
+            PositionComponent pos = e.get(PositionComponent.class);
+            float cdx = pos.x - (cursorWorld.x / tileSize);
+            float cdy = pos.y - (cursorWorld.y / tileSize);
             float dist = cdx * cdx + cdy * cdy;
             if (dist < bestDist) {
                 bestDist = dist;
-                nearest = colonist;
+                nearest = e;
             }
         }
         if (nearest != null && bestDist < 4f) {
             possessed = nearest;
-            possessed.setAiDisabled(true);
+            AIComponent ai = possessed.get(AIComponent.class);
+            if (ai != null) ai.aiDisabled = true;
         }
     }
 
-    /** Press E to pick up / drop items at the possessed colonist's feet. */
     private void handlePickup() {
-        if (possessed == null || possessed.isDead()) return;
+        if (possessed == null) return;
+        HealthComponent health = possessed.get(HealthComponent.class);
+        if (health != null && health.dead) return;
         if (!Gdx.input.isKeyJustPressed(Input.Keys.E)) return;
 
-        int tileX = (int) possessed.getX();
-        int tileY = (int) possessed.getY();
+        PositionComponent pos = possessed.get(PositionComponent.class);
+        InventoryComponent inv = possessed.get(InventoryComponent.class);
+        if (pos == null || inv == null) return;
+
+        int tileX = (int) pos.x;
+        int tileY = (int) pos.y;
         Tile tile = world.getTile(tileX, tileY);
-        if (tile == null) {
-            showPickupMessage("No tile here!");
+        if (tile == null) { showPickupMessage("No tile here!"); return; }
+
+        if (inv.carriedItem != null) {
+            tile.addItem(inv.carriedItem);
+            showPickupMessage("Dropped " + inv.carriedItem.getType().name());
+            inv.carriedItem = null;
             return;
         }
 
-        if (possessed.getCarriedItem() != null) {
-            tile.addItem(possessed.getCarriedItem());
-            showPickupMessage("Dropped " + possessed.getCarriedItem().getType().name());
-            possessed.setCarriedItem(null);
-            return;
-        }
-
-        // Try picking up from a building's output buffer first
-        Building building = tile.getBuilding();
-        if (building instanceof Miner) {
-            Miner miner = (Miner) building;
-            if (miner.hasOutput()) {
-                Item item = miner.takeOutput();
-                possessed.setCarriedItem(item);
-                showPickupMessage("Picked up " + item.getType().name() + " from Miner");
-                return;
-            }
-        }
-        if (building instanceof FoodGrower) {
-            FoodGrower grower = (FoodGrower) building;
-            if (grower.hasOutput()) {
-                Item item = grower.takeOutput();
-                possessed.setCarriedItem(item);
-                showPickupMessage("Picked up " + item.getType().name() + " from FoodGrower");
+        // Try building output
+        Entity buildingEntity = tile.getBuildingEntity();
+        if (buildingEntity != null) {
+            BuildingComponent bc = buildingEntity.get(BuildingComponent.class);
+            if (bc != null && bc.hasOutput()) {
+                Item item = bc.takeOutput();
+                inv.carriedItem = item;
+                showPickupMessage("Picked up " + item.getType().name() + " from " + bc.buildingType);
                 return;
             }
         }
 
-        // Otherwise pick up ground item
+        // Ground item
         if (!tile.getGroundItems().isEmpty()) {
             Item picked = tile.getGroundItems().remove(0);
-            possessed.setCarriedItem(picked);
+            inv.carriedItem = picked;
             showPickupMessage("Picked up " + picked.getType().name());
             return;
         }
@@ -191,8 +188,10 @@ public class PlayerController {
     }
 
     private void handlePossessedMovement(float delta) {
-        float moveX = 0f;
-        float moveY = 0f;
+        PositionComponent pos = possessed.get(PositionComponent.class);
+        if (pos == null) return;
+
+        float moveX = 0f, moveY = 0f;
         if (Gdx.input.isKeyPressed(Input.Keys.W)) moveY += 1f;
         if (Gdx.input.isKeyPressed(Input.Keys.S)) moveY -= 1f;
         if (Gdx.input.isKeyPressed(Input.Keys.A)) moveX -= 1f;
@@ -203,24 +202,23 @@ public class PlayerController {
         moveX /= length;
         moveY /= length;
 
-        possessed.setPosition(
-                possessed.getX() + moveX * MOVE_SPEED * delta,
-                possessed.getY() + moveY * MOVE_SPEED * delta
-        );
+        pos.x += moveX * MOVE_SPEED * delta;
+        pos.y += moveY * MOVE_SPEED * delta;
     }
 
     private void updateCameraFollow() {
-        camera.position.set(possessed.getX() * tileSize, possessed.getY() * tileSize, 0f);
+        PositionComponent pos = possessed.get(PositionComponent.class);
+        if (pos == null) return;
+        camera.position.set(pos.x * tileSize, pos.y * tileSize, 0f);
         camera.update();
     }
 
     private void handleCameraPan(float delta) {
-        float panX = 0f;
-        float panY = 0f;
-        if (Gdx.input.isKeyPressed(Input.Keys.A))  panX -= 1f;
-        if (Gdx.input.isKeyPressed(Input.Keys.D))  panX += 1f;
-        if (Gdx.input.isKeyPressed(Input.Keys.S))  panY -= 1f;
-        if (Gdx.input.isKeyPressed(Input.Keys.W))  panY += 1f;
+        float panX = 0f, panY = 0f;
+        if (Gdx.input.isKeyPressed(Input.Keys.A)) panX -= 1f;
+        if (Gdx.input.isKeyPressed(Input.Keys.D)) panX += 1f;
+        if (Gdx.input.isKeyPressed(Input.Keys.S)) panY -= 1f;
+        if (Gdx.input.isKeyPressed(Input.Keys.W)) panY += 1f;
 
         if (panX != 0f || panY != 0f) {
             camera.position.x += panX * CAMERA_PAN_SPEED * camera.zoom * delta;

@@ -104,8 +104,15 @@ public class PlayerController {
         moveX /= length;
         moveY /= length;
 
-        pos.x += moveX * MOVE_SPEED * delta;
-        pos.y += moveY * MOVE_SPEED * delta;
+        float newX = pos.x + moveX * MOVE_SPEED * delta;
+        float newY = pos.y + moveY * MOVE_SPEED * delta;
+
+        if (world.isPassable((int) newX, (int) pos.y)) {
+            pos.x = newX;
+        }
+        if (world.isPassable((int) pos.x, (int) newY)) {
+            pos.y = newY;
+        }
     }
 
     private void handleEatAndSleep() {

@@ -17,7 +17,9 @@ import com.haraldsson.syntropy.world.World;
  */
 public class ThinkNode_EatFood extends ThinkNode {
     private static final float MOVE_SPEED = 2.2f;
-    private static final float FOOD_MOVEMENT_TIMEOUT_SECONDS = 8f;
+    private static final float STUCK_TIMEOUT_SECONDS = 6f;
+
+    private float stuckTimer = 0f;
 
     @Override
     public float getPriority(Entity entity, ECSWorld ecsWorld, World world) {
@@ -41,22 +43,29 @@ public class ThinkNode_EatFood extends ThinkNode {
         InventoryComponent inv = entity.get(InventoryComponent.class);
         if (needs == null || ai == null || pos == null) return false;
 
+        // Step 1: Timeout check for stuck navigation states
+        if (ai.taskType == TaskType.MOVE_TO_FOOD || ai.taskType == TaskType.MOVE_TO_FOOD_GROWER) {
+            stuckTimer += delta;
+            if (stuckTimer > STUCK_TIMEOUT_SECONDS) {
+                ai.clearTask();
+                stuckTimer = 0f;
+                return false;
+            }
+        }
+
         Tile foodTile = world.findNearestFoodTile(pos.x, pos.y);
         if (foodTile != null) {
-            // Walk to food tile and eat
+            // Step 2: Walk to food tile and eat
             if (ai.taskType != TaskType.MOVE_TO_FOOD) {
                 ai.setTask(TaskType.MOVE_TO_FOOD, foodTile.getX(), foodTile.getY());
-                ai.resetWanderCooldown(FOOD_MOVEMENT_TIMEOUT_SECONDS);
-            } else if (ai.shouldPickNewWanderTarget(delta)) {
-                // Stuck trying to reach food for too long — give up
-                ai.clearTask();
-                return false;
+                stuckTimer = 0f;
             }
             ai.moveTowardTarget(pos, delta, MOVE_SPEED, world);
             if (ai.isAtTarget(pos.x, pos.y)) {
                 Item food = foodTile.takeFirstItem(ItemType.FOOD);
                 if (food != null) needs.eat();
                 ai.clearTask();
+                stuckTimer = 0f;
             }
             return true;
         }
@@ -68,6 +77,7 @@ public class ThinkNode_EatFood extends ThinkNode {
             if (stockpile == null) {
                 inv.carriedItem = null;
                 ai.clearTask();
+                stuckTimer = 0f;
                 return false;
             }
             ai.setTask(TaskType.HAULING, stockpile.getX(), stockpile.getY());
@@ -78,17 +88,21 @@ public class ThinkNode_EatFood extends ThinkNode {
                 Item food = stockpile.takeFirstItem(ItemType.FOOD);
                 if (food != null) needs.eat();
                 ai.clearTask();
+                stuckTimer = 0f;
             }
             return true;
         }
 
-        // Find a FOOD_GROWER building with output to pick up
+        // Step 3: Find a FOOD_GROWER building with output to pick up
         for (Entity bldg : ecsWorld.getEntitiesWith(BuildingComponent.class, PositionComponent.class)) {
             BuildingComponent bc = bldg.get(BuildingComponent.class);
             if (!"FOOD_GROWER".equalsIgnoreCase(bc.buildingType) && !"FOODGROWER".equalsIgnoreCase(bc.buildingType)) continue;
             if (!bc.hasOutput()) continue;
             PositionComponent bp = bldg.get(PositionComponent.class);
-            ai.setTask(TaskType.MOVE_TO_FOOD_GROWER, (int) bp.x, (int) bp.y);
+            if (ai.taskType != TaskType.MOVE_TO_FOOD_GROWER) {
+                ai.setTask(TaskType.MOVE_TO_FOOD_GROWER, (int) bp.x, (int) bp.y);
+                stuckTimer = 0f;
+            }
             ai.moveTowardTarget(pos, delta, MOVE_SPEED, world);
             if (ai.isAtTarget(pos.x, pos.y)) {
                 Item output = bc.takeOutput();
@@ -98,11 +112,12 @@ public class ThinkNode_EatFood extends ThinkNode {
                 } else {
                     ai.clearTask();
                 }
+                stuckTimer = 0f;
             }
             return true;
         }
 
-        // No FOOD_GROWER with output found — nothing to do yet
+        // Step 4: Nothing found — fall through to wander/idle
         return false;
     }
 }

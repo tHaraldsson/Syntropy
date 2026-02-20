@@ -168,6 +168,8 @@ public class GameApp extends ApplicationAdapter {
                 IdentityComponent id = e.get(IdentityComponent.class);
                 if (e.has(LeaderComponent.class)) {
                     gameState.events.fire(EventType.LEADER_DIED, id.name);
+                    // Trigger succession for any cause of leader death, not only old age
+                    agingSystem.triggerSuccession(id.name + " has died.");
                 } else {
                     gameState.events.fire(EventType.COLONIST_DIED, id.name);
                 }

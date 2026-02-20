@@ -80,7 +80,16 @@ public class ThinkNode_EatFood extends ThinkNode {
 
         // No food on ground — try to haul from a FOOD_GROWER
         if (inv != null && inv.carriedItem != null && inv.carriedItem.getType() == ItemType.FOOD) {
-            // Already carrying food: deliver to stockpile then eat
+            // If starving or urgently hungry, eat immediately instead of hauling to stockpile
+            HungerCategory hunger = needs.getHungerCategory();
+            if (hunger == HungerCategory.STARVING || hunger == HungerCategory.URGENTLY_HUNGRY) {
+                needs.eat();
+                inv.carriedItem = null;
+                ai.clearTask();
+                ai.stuckTimer = 0f;
+                return true;
+            }
+            // Otherwise deliver to stockpile then eat
             Tile stockpile = world.getStockpileTile();
             if (stockpile == null) {
                 inv.carriedItem = null;
@@ -128,12 +137,19 @@ public class ThinkNode_EatFood extends ThinkNode {
             if (ai.isAtTarget(pos.x, pos.y)) {
                 Item output = bc.takeOutput();
                 if (output != null && inv != null) {
-                    inv.carriedItem = output;
-                    Tile stockpile = world.getStockpileTile();
-                    if (stockpile != null) {
-                        ai.setTask(TaskType.HAULING, stockpile.getX(), stockpile.getY());
-                    } else {
+                    HungerCategory hunger = needs.getHungerCategory();
+                    if (hunger == HungerCategory.STARVING || hunger == HungerCategory.URGENTLY_HUNGRY) {
+                        // Eat immediately — do not haul to stockpile
+                        needs.eat();
                         ai.clearTask();
+                    } else {
+                        inv.carriedItem = output;
+                        Tile stockpile = world.getStockpileTile();
+                        if (stockpile != null) {
+                            ai.setTask(TaskType.HAULING, stockpile.getX(), stockpile.getY());
+                        } else {
+                            ai.clearTask();
+                        }
                     }
                 } else {
                     ai.clearTask();

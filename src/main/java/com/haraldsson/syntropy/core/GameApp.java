@@ -27,7 +27,7 @@ import com.haraldsson.syntropy.world.Tile;
 import com.haraldsson.syntropy.world.WorldGenerator;
 
 public class GameApp extends ApplicationAdapter {
-    public static final int TILE_SIZE = 64;
+    public static final int TILE_SIZE = 32;
     private static final int WORLD_WIDTH = 50;
     private static final int WORLD_HEIGHT = 50;
 
@@ -98,6 +98,7 @@ public class GameApp extends ApplicationAdapter {
         });
         Gdx.input.setInputProcessor(multiplexer);
 
+        camera.zoom = 1.0f;
         centerCameraOnWorld();
     }
 
@@ -390,7 +391,8 @@ public class GameApp extends ApplicationAdapter {
             float cy = pos.y * TILE_SIZE;
 
             Texture tex = spriteManager.getColonistTexture(health.dead, isLeader);
-            spriteBatch.draw(tex, cx + 10, cy + 10, TILE_SIZE - 20, TILE_SIZE - 20);
+            int pad = TILE_SIZE / 6;
+            spriteBatch.draw(tex, cx + pad, cy + pad, TILE_SIZE - TILE_SIZE / 3, TILE_SIZE - TILE_SIZE / 3);
 
             if (health.dead) continue;
 

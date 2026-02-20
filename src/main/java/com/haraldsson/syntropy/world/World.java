@@ -78,7 +78,7 @@ public class World {
     }
 
     /** Body radius used for 4-corner collision checks — prevents clipping into wall sprites. */
-    private static final float COLLISION_BODY_RADIUS = 0.15f;
+    private static final float COLLISION_BODY_RADIUS = 0.35f;
 
     /**
      * 4-corner body check — returns true if a circular body of radius COLLISION_BODY_RADIUS

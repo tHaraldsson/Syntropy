@@ -6,8 +6,39 @@ The core narrative arc: **Survive → Automate → Expand → Cause Problems →
 
 ---
 
+## Agent Scan Summary (2026-02-20)
+
+All source files were read in full. The following is a summary of findings:
+
+- **`GameApp.java`** — Main game loop. Succession state uses `pendingSuccession` (boolean) and `successionCandidates` (List<Entity>) consistently. Event bus wired via `wireEventBus()`. No static game state.
+- **`GameState.java`** — Root serializable object. Holds `World`, `ECSWorld`, `GameEvents`, `ResearchSystem`, `PollutionSystem`, dynasty tracking. No statics.
+- **`BuildingProductionSystem.java`** — Fires `RESOURCE_PRODUCED` via `events.fireAndLog()` on each production tick. `GameEvents` injected via `setEvents()`.
+- **`ResearchSystem.java`** — Full 5-era tech tree (22 techs). Fires `RESEARCH_COMPLETED` on completion. `startResearch(String id)` enforces prerequisites. `startNextResearch()` respects prerequisites and era order.
+- **`Technology.java`** — Fields: `id`, `name`, `description`, `researchTime`, `era`, `prerequisites`, `progress`, `unlocked`. Gson-serializable. No lambdas.
+- **`NeedsSystem.java`** — Drops `inv.carriedItem` to ground tile on first death tick via `HealthComponent.deathItemsDropped` flag. Despawns entity after 30 seconds.
+- **`AgingSystem.java`** — Natural aging, death detection, succession triggering. Leader succession defers to `GameApp` UI when multiple candidates exist.
+- **`ThinkNode_Haul.java`** — Checks `WorkSettingsComponent.getPriority(HAULER) > 0` before activating. Returns 0f for non-HAULER colonists.
+- **`ThinkNode_DoAssignedJob.java`** — Uses `WorkSettingsComponent.getActiveJobsSorted()` to pick the highest-priority assigned role.
+- **`ThinkNode_EatFood.java`** — Priority 100 for STARVING/URGENTLY_HUNGRY. Stuck timeout 6s.
+- **`ThinkNode_Rest.java`** — Priority 80 for EXHAUSTED/COLLAPSED. Bed-stuck fallback after 10s.
+- **`ThinkNode_Socialize.java`** — Priority 10 when needs met. Stays 5s then clears.
+- **`ThinkNode_Wander.java`** — Priority 1 (idle). Does not interrupt RESTING.
+- **`InventoryComponent.java`** — Single field `carriedItem` (Item). Gson-serializable.
+- **`AIComponent.java`** — Task type, target, stuck timer fields. Shared per-colonist (no static state).
+- **`HealthComponent.java`** — `dead`, `deathEventFired`, `deathItemsDropped`, `deathTimer` flags.
+- **`NeedsComponent.java`** — `hunger`, `energy`, `health` floats (0.0–1.0). Category derivation methods.
+- **`WorkSettingsComponent.java`** — `Map<ColonistRole, Integer>` priorities (0–4). Pattern 6.
+- **`BuildingComponent.java`** — `outputBuffer`, `productionInterval`, `maxOutput`, `built`, `buildingType`, `producedItemType`. Gson-serializable.
+- **`ECSWorld.java`** — Entity registry. `getEntitiesWith(...)` component query. No statics.
+- **`World.java`** — 2D tile grid. `getTile(x, y)`, `getStockpileTile()`, `clampPosition()`.
+- **`GameEvents.java`** — Instance-based event bus. `on()`, `fire()`, `fireAndLog()`, `clearListeners()`, `getEventLog()`.
+- **`EventType.java`** — Enum of all event types. No static references.
+- **Tests** — 13 headless JUnit 5 tests across 4 test classes. All pass without LibGDX rendering.
+
+---
+
 ## Tech Stack
-- **Language:** Java 17
+- **Language:** Java 21 (project targets 21 via Gradle toolchain)
 - **Engine:** LibGDX (2D rendering, input)
 - **Build:** Gradle
 - **Architecture:** Modular Entity-Component-System (ECS)
@@ -26,25 +57,25 @@ The core narrative arc: **Survive → Automate → Expand → Cause Problems →
 
 ---
 
-## Issue Classification (as of 2026-02-20)
+## Issue Classification (2026-02-20)
 
-### A — Logic Bugs (incorrect behavior violating stated invariants)
-1. ✅ **`BuildingProductionSystem` did not fire `RESOURCE_PRODUCED`** — violated the invariant that all inter-system communication goes through the event bus. Fixed: fires `RESOURCE_PRODUCED` via `gameState.events.fireAndLog()` after each production tick.
-2. ✅ **`ResearchSystem` did not fire `RESEARCH_COMPLETED`** — same invariant violation. Fixed: fires `RESEARCH_COMPLETED` via `events.fire()` when a tech's progress reaches its `researchTime`.
-3. ✅ **Research system was a flat 4-tech tree** — the architecture specifies 5 eras with prerequisites. Fixed: replaced with 22 techs across 5 eras, each with `id`, `displayName`, `era`, `prerequisites`, `researchCost`. `startResearch()` enforces prerequisites before beginning.
-4. ✅ **Colonist death did not drop carried items** — if a colonist died while carrying an item, the item was silently lost. Fixed: `NeedsSystem` now drops `inv.carriedItem` to the ground tile at the colonist's position on the first tick after death. `HealthComponent.deathItemsDropped` flag prevents duplicate drops.
-5. ✅ **`ThinkNode_Haul` fired for ALL colonists regardless of role** — `ThinkNode_Haul` at priority 50 activated for any colonist who saw building output, conflicting with `ThinkNode_DoAssignedJob` at the same priority. Fixed: `ThinkNode_Haul.getPriority()` now checks `WorkSettingsComponent` for `HAULER` role (priority > 0) and returns 0 if not a HAULER.
-6. ✅ **`successionCandidates` / `pendingSuccession` field name consistency** — verified in `GameApp`: `private boolean pendingSuccession` and `private List<Entity> successionCandidates` are used consistently throughout the file. No mismatch found.
+### Category A — Logic Bugs (must fix)
+- A1: `BuildingProductionSystem` did not fire `RESOURCE_PRODUCED` — violated the invariant that all inter-system communication goes through the event bus. ✅ **Fixed:** fires `RESOURCE_PRODUCED` via `events.fireAndLog()` after each production tick. Regression test: `BuildingProductionSystemTest.firesResourceProducedEvent()`.
+- A2: `ResearchSystem` did not fire `RESEARCH_COMPLETED` — same event-bus invariant violated. ✅ **Fixed:** fires `RESEARCH_COMPLETED` via `events.fire()` when progress reaches `researchTime`. Regression test: `ResearchSystemTest.firesResearchCompletedEventWhenTechFinishes()`.
+- A3: Research system was a flat 4-tech tree — context specifies 5-era system with prerequisites. ✅ **Fixed:** replaced with 22 techs across 5 eras; `startResearch(String id)` enforces prerequisites; `startNextResearch()` respects era order. Regression tests: `cannotStartTechWithUnmetPrerequisite()`, `canStartTechWhenPrerequisitesMet()`, `startNextResearchSkipsTechsWithUnmetPrerequisites()`.
+- A4: Colonist death did not drop carried item — violated design decision 3 ("Items are dropped to the ground tile"). ✅ **Fixed:** `NeedsSystem` drops `inv.carriedItem` to `world.getTile(pos.x, pos.y)` on first death tick; `HealthComponent.deathItemsDropped` flag prevents re-drop. Regression tests: `ColonistDeathTest`.
+- A5: `ThinkNode_Haul` activated for ALL colonists regardless of role — violated Pattern 6 (per-colonist role priorities). ✅ **Fixed:** `ThinkNode_Haul.getPriority()` returns 0f if `WorkSettingsComponent` is absent or HAULER priority = 0. Regression tests: `ThinkNodeHaulTest`.
+- A6: `successionCandidates` / `pendingSuccession` field name consistency in `GameApp` — verified consistent: `private boolean pendingSuccession` and `private List<Entity> successionCandidates`. ✅ **No mismatch found.**
 
-### B — State-Transition Ambiguities (undefined/contradictory behavior in edge cases)
-1. **HAULER carrying item on death** — if a HAULER dies mid-haul, the item is now dropped to their position tile. Whether hauling resumes for another colonist is undefined (no pending haul task system yet).
-2. **Multiple colonists targeting same building output** — two HAULER colonists can both pick from the same building in the same tick before outputs are decremented. Acceptable given current single-output-per-tick design, but could cause race conditions with multiple haulers.
-3. **Research interrupted by load** — if the game is saved mid-research and loaded, `currentResearch` resumes from `progress`. This is the intended behavior but is implicit.
+### Category B — State-Transition Ambiguities (simulate + report)
+- B1: HAULER carrying item on death — item is now dropped to their position tile (A4 fix covers this). Whether another colonist resumes the haul is undefined — no pending-task queue exists yet. **Observed:** dropped item sits on the tile until another HAULER happens to pass the building and picks up new output. The dropped item is recoverable only if the stockpile tile is the destination and another hauler picks it up manually. **Reported to human — no code change.**
+- B2: Multiple colonists targeting same building output simultaneously — two HAULERs can both enter the pick-up branch in the same tick before the output buffer is decremented. Given current single-output-per-tick production, this is rare but possible with many haulers. **Observed:** second colonist gets `null` from `bc.takeOutput()` and keeps carrying nothing (no crash). **Reported to human — no code change.**
+- B3: Research interrupted by save/load — `currentResearch` reference is not directly Gson-serializable (it's a reference into the tech tree list). On load, `startNextResearch()` or `startResearch()` would need to be re-called. **Observed:** after load, `currentResearch` is null; research must be restarted manually. This is implicit behavior. **Reported to human — deferred to save/load system refactor.**
 
-### C — Acceptable Design Failures (intentional limitations or known tradeoffs)
-1. **No `ThinkNode_ReactToEmergency`** — requires combat/threat system which is not yet implemented. Acceptable limitation.
-2. **Single stockpile tile** — `World.getStockpileTile()` returns one tile. Multiple stockpiles would require a list, but single-stockpile is acceptable for current scope.
-3. **Linear tech ordering in `startNextResearch()`** — picks first available tech in declaration order. Players may prefer to choose; this is deferred to a research UI screen.
+### Category C — Acceptable Design Limitations (document only)
+- C1: No `ThinkNode_ReactToEmergency` — requires combat/threat system not yet implemented. Does not break any current invariant (node simply doesn't exist in the tree).
+- C2: Single stockpile tile — `World.getStockpileTile()` returns one tile. Multiple stockpiles would require a list; acceptable for current scope. Invariant not violated.
+- C3: Linear tech ordering in `startNextResearch()` — picks first available tech in declaration order. Player choice deferred to a future research UI screen. Invariant not violated (prerequisites still enforced).
 
 ---
 
@@ -575,3 +606,22 @@ public class ColonistBarEntry {
 3. **Regional pollution granularity:** Per-tile or per-chunk (e.g., 5x5 tile regions)?
 4. **Research eras:** Should techs within an era be researchable in any order, or strictly linear? **Current:** any order within an era as long as prerequisites are met.
 5. **Combat system:** What triggers `ThinkNode_ReactToEmergency`? Do we need hostile entities first, or can we start with natural disasters (fire)?
+
+---
+
+## Invariants Verified (2026-02-20)
+
+The following architecture invariants were checked against all source files after Phase 2 fixes:
+
+| # | Invariant | Status | Evidence |
+|---|-----------|--------|---------|
+| 1 | **No static game state** — all world/entity/faction data lives in `GameState` | ✅ Verified | `GameApp` holds `private GameState gameState`. No `static` fields for game data. |
+| 2 | **No singletons for game data** — pass `GameState` explicitly | ✅ Verified | All systems receive `ECSWorld`/`World` via `update()` parameters. `GameEvents` injected via `setEvents()` or constructor. |
+| 3 | **ECS components must be Gson-serializable** — primitives, String, List, Map only | ✅ Verified | All new fields in `HealthComponent` (`deathItemsDropped`), `Technology` (`era`, `prerequisites`) are primitive or `List<String>`. No lambdas stored in components. |
+| 4 | **All inter-system communication via event bus** — no direct system-to-system calls | ✅ Verified | A1: `BuildingProductionSystem` fires `RESOURCE_PRODUCED`. A2: `ResearchSystem` fires `RESEARCH_COMPLETED`. No system calls another system's methods directly. |
+| 5 | **Event bus is instance-based** — `gameState.events`, never static | ✅ Verified | `GameEvents` has no static fields. `BuildingProductionSystem` receives it via `setEvents()`. `ResearchSystem` receives it via constructor. |
+| 6 | **Java 21** — use modern features where genuinely cleaner | ✅ Verified | Gradle toolchain set to `JavaLanguageVersion.of(21)`. |
+| 7 | **LibGDX only in rendering** — all game logic testable headlessly | ✅ Verified | All 13 JUnit 5 tests run without `Gdx.*` or `SpriteBatch`. `NeedsSystem`, `BuildingProductionSystem`, `ResearchSystem`, and `ThinkNode_Haul` have no LibGDX imports in their logic paths. |
+| 8 | **Carried items on colonist death dropped to ground tile** | ✅ Verified | `NeedsSystem` drops `inv.carriedItem` to `world.getTile((int)pos.x, (int)pos.y)` on first dead-tick. `deathItemsDropped` flag prevents re-drop. |
+| 9 | **`ThinkNode_Haul` restricted to HAULER-role colonists** | ✅ Verified | `getPriority()` returns 0f if `WorkSettingsComponent` is null or `getPriority(HAULER) == 0`. |
+| 10 | **Research prerequisites enforced** — era-1 techs unlocked by default; others require prerequisites | ✅ Verified | `startResearch(String id)` calls `prerequisitesMet(tech)` before setting `currentResearch`. `startNextResearch()` does the same. |

@@ -37,3 +37,7 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+
+### Game save files ###
+syntropy_save.json
+*.save.json

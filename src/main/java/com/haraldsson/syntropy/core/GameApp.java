@@ -337,12 +337,20 @@ public class GameApp extends ApplicationAdapter {
         }
 
         smallFont.setColor(0.6f, 0.6f, 0.6f, 1f);
-        smallFont.draw(spriteBatch, "[P] Possess  [WASD] Move  [Arrows] Pan  [Scroll] Zoom  [F5] Save  [F9] Load", 10, 20);
+        smallFont.draw(spriteBatch, "[DblClick] Possess  [WASD] Move/Pan  [E] Pickup/Drop  [Scroll] Zoom  [F5] Save  [F9] Load", 10, 20);
 
         Colonist possessed = playerController.getPossessed();
         if (possessed != null) {
             font.setColor(Color.RED);
             font.draw(spriteBatch, "POSSESSING: " + possessed.getName(), 10, screenH - 80);
+            font.setColor(Color.WHITE);
+        }
+
+        // Pickup message
+        String pickupMsg = playerController.getPickupMessage();
+        if (!pickupMsg.isEmpty()) {
+            font.setColor(Color.CYAN);
+            font.draw(spriteBatch, pickupMsg, 10, screenH - 100);
             font.setColor(Color.WHITE);
         }
 

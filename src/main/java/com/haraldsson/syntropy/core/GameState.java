@@ -29,7 +29,7 @@ public class GameState {
         this.world = world;
         this.ecsWorld = ecsWorld;
         this.events = new GameEvents();
-        this.research = new ResearchSystem();
+        this.research = new ResearchSystem(this.events);
         this.pollution = new PollutionSystem();
     }
 }

@@ -513,18 +513,18 @@ public class ColonistBarEntry {
 - **Succession selection UI** — when succession is needed and multiple candidates exist, game pauses and shows overlay with up to 5 candidates + stats; player presses 1–5 to choose. Single candidate auto-selected with message.
 - **World reset (Ctrl+R)** — regenerates a fresh 50×50 world without restarting the application. Shown in HUD controls hint.
 - **World size 50×50** — `WORLD_WIDTH` and `WORLD_HEIGHT` constants updated from 30 to 50.
+- **Event bus wired into BuildingProductionSystem** — `BuildingProductionSystem` holds a `GameEvents` reference (set via `setEvents()` in `wireEventBus()`). Fires `RESOURCE_PRODUCED` via `fireAndLog` each time a building outputs an item.
+- **Event bus wired into ResearchSystem** — `ResearchSystem` accepts `GameEvents` in its constructor (passed from `GameState`). Fires `RESEARCH_COMPLETED` (via `fire()`) when a tech finishes; the existing `wireEventBus()` listener logs the completion message.
+- **5-era research system** — `Technology` gains `era` (1–5) and `List<String> prerequisites` fields. `ResearchSystem` now contains 22 techs across 5 eras (Survival → Automation → Industrial → Space → Legacy) with prerequisite enforcement. `startResearch(String techId)`, `isCompleted(String techId)`, and `prerequisitesMet(Technology)` added. `startNextResearch()` respects prerequisites.
 
 ### Current Focus 🔨
 - Add `ThinkNode_ReactToEmergency` (fire, attack, injury — priority 999). Needs combat/threat system first.
-- Wire event bus into BuildingProductionSystem (fire RESOURCE_PRODUCED)
-- Wire event bus into ResearchSystem (fire RESEARCH_COMPLETED)
-
-### Near-Term Goals 📋
 - Basic faction system (at least one rival AI colony contributing to global pollution)
 - Regional pollution (per-tile pollution levels, biome degradation)
+
+### Near-Term Goals 📋
 - Blueprint placement system (place ghost → colonists auto-build)
 - Eco-friendly vs industrial building variants
-- Research era system (5 eras with prerequisites, replacing flat 4-tech tree)
 
 ### Future Goals 🚀
 - Children and trait inheritance (colonist relationships, bloodlines)

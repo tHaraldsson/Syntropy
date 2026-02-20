@@ -4,6 +4,7 @@ import com.haraldsson.syntropy.ai.ThinkNode;
 import com.haraldsson.syntropy.ecs.ECSWorld;
 import com.haraldsson.syntropy.ecs.Entity;
 import com.haraldsson.syntropy.ecs.components.*;
+import com.haraldsson.syntropy.entities.ColonistRole;
 import com.haraldsson.syntropy.entities.Item;
 import com.haraldsson.syntropy.entities.TaskType;
 import com.haraldsson.syntropy.world.Tile;
@@ -18,6 +19,10 @@ public class ThinkNode_Haul extends ThinkNode {
 
     @Override
     public float getPriority(Entity entity, ECSWorld ecsWorld, World world) {
+        // FIX: ThinkNode_Haul only activates for HAULER-role colonists — 2026-02-20
+        WorkSettingsComponent work = entity.get(WorkSettingsComponent.class);
+        if (work == null || work.getPriority(ColonistRole.HAULER) == 0) return 0f;
+
         InventoryComponent inv = entity.get(InventoryComponent.class);
         if (inv != null && inv.carriedItem != null) return 50f; // must deliver
 

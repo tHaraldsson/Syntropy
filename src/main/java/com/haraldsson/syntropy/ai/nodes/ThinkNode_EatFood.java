@@ -17,6 +17,7 @@ import com.haraldsson.syntropy.world.World;
  */
 public class ThinkNode_EatFood extends ThinkNode {
     private static final float MOVE_SPEED = 2.2f;
+    private static final float FOOD_MOVEMENT_TIMEOUT_SECONDS = 8f;
 
     @Override
     public float getPriority(Entity entity, ECSWorld ecsWorld, World world) {
@@ -43,8 +44,15 @@ public class ThinkNode_EatFood extends ThinkNode {
         Tile foodTile = world.findNearestFoodTile(pos.x, pos.y);
         if (foodTile != null) {
             // Walk to food tile and eat
-            ai.setTask(TaskType.MOVE_TO_FOOD, foodTile.getX(), foodTile.getY());
-            ai.moveTowardTarget(pos, delta, MOVE_SPEED);
+            if (ai.taskType != TaskType.MOVE_TO_FOOD) {
+                ai.setTask(TaskType.MOVE_TO_FOOD, foodTile.getX(), foodTile.getY());
+                ai.resetWanderCooldown(FOOD_MOVEMENT_TIMEOUT_SECONDS);
+            } else if (ai.shouldPickNewWanderTarget(delta)) {
+                // Stuck trying to reach food for too long — give up
+                ai.clearTask();
+                return false;
+            }
+            ai.moveTowardTarget(pos, delta, MOVE_SPEED, world);
             if (ai.isAtTarget(pos.x, pos.y)) {
                 Item food = foodTile.takeFirstItem(ItemType.FOOD);
                 if (food != null) needs.eat();
@@ -63,7 +71,7 @@ public class ThinkNode_EatFood extends ThinkNode {
                 return false;
             }
             ai.setTask(TaskType.HAULING, stockpile.getX(), stockpile.getY());
-            ai.moveTowardTarget(pos, delta, MOVE_SPEED);
+            ai.moveTowardTarget(pos, delta, MOVE_SPEED, world);
             if (ai.isAtTarget(pos.x, pos.y)) {
                 stockpile.addItem(inv.carriedItem);
                 inv.carriedItem = null;
@@ -81,7 +89,7 @@ public class ThinkNode_EatFood extends ThinkNode {
             if (!bc.hasOutput()) continue;
             PositionComponent bp = bldg.get(PositionComponent.class);
             ai.setTask(TaskType.MOVE_TO_FOOD_GROWER, (int) bp.x, (int) bp.y);
-            ai.moveTowardTarget(pos, delta, MOVE_SPEED);
+            ai.moveTowardTarget(pos, delta, MOVE_SPEED, world);
             if (ai.isAtTarget(pos.x, pos.y)) {
                 Item output = bc.takeOutput();
                 if (output != null && inv != null) {

@@ -97,7 +97,7 @@ public class ThinkNode_DoAssignedJob extends ThinkNode {
             Tile stockpile = world.getStockpileTile();
             if (stockpile == null) return false;
             ai.setTask(TaskType.MOVE_TO_STOCKPILE, stockpile.getX(), stockpile.getY());
-            ai.moveTowardTarget(pos, delta, MOVE_SPEED);
+            ai.moveTowardTarget(pos, delta, MOVE_SPEED, world);
             if (ai.isAtTarget(pos.x, pos.y)) {
                 stockpile.addItem(inv.carriedItem);
                 inv.carriedItem = null;
@@ -111,7 +111,7 @@ public class ThinkNode_DoAssignedJob extends ThinkNode {
             if (!bc.hasOutput()) continue;
             PositionComponent bp = bldg.get(PositionComponent.class);
             ai.setTask(TaskType.MOVE_TO_MINER, (int) bp.x, (int) bp.y);
-            ai.moveTowardTarget(pos, delta, MOVE_SPEED);
+            ai.moveTowardTarget(pos, delta, MOVE_SPEED, world);
             if (ai.isAtTarget(pos.x, pos.y)) {
                 Item output = bc.takeOutput();
                 if (output != null) inv.carriedItem = output;
@@ -133,7 +133,7 @@ public class ThinkNode_DoAssignedJob extends ThinkNode {
             Tile stockpile = world.getStockpileTile();
             if (stockpile == null) return false;
             ai.setTask(TaskType.MOVE_TO_STOCKPILE, stockpile.getX(), stockpile.getY());
-            ai.moveTowardTarget(pos, delta, MOVE_SPEED);
+            ai.moveTowardTarget(pos, delta, MOVE_SPEED, world);
             if (ai.isAtTarget(pos.x, pos.y)) {
                 stockpile.addItem(inv.carriedItem);
                 inv.carriedItem = null;
@@ -148,7 +148,7 @@ public class ThinkNode_DoAssignedJob extends ThinkNode {
             PositionComponent bp = bldg.get(PositionComponent.class);
             TaskType task = "MINER".equals(buildingType) ? TaskType.MOVE_TO_MINER : TaskType.MOVE_TO_FOOD_GROWER;
             ai.setTask(task, (int) bp.x, (int) bp.y);
-            ai.moveTowardTarget(pos, delta, MOVE_SPEED);
+            ai.moveTowardTarget(pos, delta, MOVE_SPEED, world);
             if (ai.isAtTarget(pos.x, pos.y)) {
                 Item output = bc.takeOutput();
                 if (output != null) inv.carriedItem = output;

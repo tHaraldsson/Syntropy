@@ -59,7 +59,7 @@ public class ThinkNode_Rest extends ThinkNode {
 
                 if (!ai.isAtTarget(pos.x, pos.y)) {
                     // Walk toward the bed
-                    ai.moveTowardTarget(pos, delta, MOVE_SPEED);
+                    ai.moveTowardTarget(pos, delta, MOVE_SPEED, world);
                     return true;
                 }
 

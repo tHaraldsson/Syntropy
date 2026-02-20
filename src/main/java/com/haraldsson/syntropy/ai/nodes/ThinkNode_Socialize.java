@@ -75,7 +75,7 @@ public class ThinkNode_Socialize extends ThinkNode {
 
         // Move toward the other colonist
         ai.setTask(TaskType.WANDER, (int) targetPos.x, (int) targetPos.y);
-        ai.moveTowardTarget(pos, delta, MOVE_SPEED);
+        ai.moveTowardTarget(pos, delta, MOVE_SPEED, world);
         return true;
     }
 }

@@ -60,7 +60,7 @@ public class ThinkNode_Rest extends ThinkNode {
             if (bedPos != null) {
                 // Set or maintain RESTING task targeting the bed
                 if (ai.taskType != TaskType.RESTING) {
-                    ai.setTask(TaskType.RESTING, (int) bedPos.x, (int) bedPos.y);
+                    ai.setTask(TaskType.RESTING, (int) Math.floor(bedPos.x), (int) Math.floor(bedPos.y));
                 }
 
                 if (!ai.isAtTarget(pos.x, pos.y)) {
@@ -69,7 +69,7 @@ public class ThinkNode_Rest extends ThinkNode {
                     if (ai.stuckTimer >= BED_STUCK_TIMEOUT) {
                         // Can't reach bed — fall back to sleeping on the ground
                         ai.stuckTimer = 0f;
-                        ai.setTask(TaskType.RESTING, (int) pos.x, (int) pos.y);
+                        ai.setTask(TaskType.RESTING, (int) Math.floor(pos.x), (int) Math.floor(pos.y));
                         ai.resetWanderCooldown(REST_DURATION);
                     } else {
                         ai.moveTowardTarget(pos, delta, MOVE_SPEED, world);
@@ -97,7 +97,7 @@ public class ThinkNode_Rest extends ThinkNode {
 
         // No owned bed: sleep on ground
         if (ai.taskType != TaskType.RESTING) {
-            ai.setTask(TaskType.RESTING, (int) pos.x, (int) pos.y);
+            ai.setTask(TaskType.RESTING, (int) Math.floor(pos.x), (int) Math.floor(pos.y));
             ai.resetWanderCooldown(REST_DURATION);
         }
 

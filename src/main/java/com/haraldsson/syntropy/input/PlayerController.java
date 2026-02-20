@@ -107,11 +107,11 @@ public class PlayerController {
         float newX = pos.x + moveX * MOVE_SPEED * delta;
         float newY = pos.y + moveY * MOVE_SPEED * delta;
 
-        // FIX BUG4a: corrected player collision to use center-point tile check (2026-02-20)
-        if (world.isPassable((int) Math.floor(newX), (int) Math.floor(pos.y))) {
+        // FIX BUG-COLLISION: 4-corner body check + axis-split for wall sliding (2026-02-20)
+        if (world.canMove(newX, pos.y)) {
             pos.x = newX;
         }
-        if (world.isPassable((int) Math.floor(pos.x), (int) Math.floor(newY))) {
+        if (world.canMove(pos.x, newY)) {
             pos.y = newY;
         }
     }

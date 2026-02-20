@@ -69,14 +69,28 @@ public class World {
     }
 
     public boolean isPassable(int tileX, int tileY) {
-        // FIX BUG2c: verified/corrected passable terrain types (2026-02-20)
-        // FIX BUG4c: Tile (x, y) occupies world-space from (x, y) to (x+1, y+1).
-        // A position (px, py) is in tile (floor(px), floor(py)).
-        // Use (int)Math.floor(px) — NOT (int)px — to avoid asymmetric collision at negative coords.
+        // Tile (x,y) occupies world-space [x, x+1) × [y, y+1).
+        // Convert float positions with Math.floor(), never with (int) cast.
         Tile t = getTile(tileX, tileY);
         if (t == null) return false;
         TerrainType type = t.getTerrainType();
         return type != TerrainType.WATER && type != TerrainType.STONE;
+    }
+
+    /** Body radius used for 4-corner collision checks — prevents clipping into wall sprites. */
+    private static final float COLLISION_BODY_RADIUS = 0.15f;
+
+    /**
+     * 4-corner body check — returns true if a circular body of radius COLLISION_BODY_RADIUS
+     * centered at (cx, cy) can occupy that position without clipping into walls.
+     * FIX BUG-COLLISION: sprite-aligned collision using Math.floor() + 4-corner body check (2026-02-20)
+     */
+    public boolean canMove(float cx, float cy) {
+        float r = COLLISION_BODY_RADIUS;
+        return isPassable((int) Math.floor(cx - r), (int) Math.floor(cy - r))
+            && isPassable((int) Math.floor(cx + r), (int) Math.floor(cy - r))
+            && isPassable((int) Math.floor(cx - r), (int) Math.floor(cy + r))
+            && isPassable((int) Math.floor(cx + r), (int) Math.floor(cy + r));
     }
 
     public int[] findNearestPassableTile(float fromX, float fromY) {

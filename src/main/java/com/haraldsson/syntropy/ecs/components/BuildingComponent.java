@@ -15,12 +15,22 @@ public class BuildingComponent implements Component {
     public float productionInterval;
     public int maxOutput;
     public ItemType producedItemType;
+    public float pollutionRate;    // pollution per second when operating
+    public boolean ecoFriendly;    // eco-friendly variant flag
+
+    public BuildingComponent() {}
 
     public BuildingComponent(String type, float interval, int max, ItemType produced) {
         this.buildingType = type;
         this.productionInterval = interval;
         this.maxOutput = max;
         this.producedItemType = produced;
+        // Default pollution rates
+        if ("MINER".equals(type)) {
+            this.pollutionRate = 0.3f;
+        } else if ("FOOD_GROWER".equals(type)) {
+            this.pollutionRate = 0.05f;
+        }
     }
 
     public boolean hasOutput() {

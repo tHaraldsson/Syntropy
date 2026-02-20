@@ -64,17 +64,18 @@ public class EventSystem {
     private void eventHeatWave(List<Entity> alive) {
         for (Entity e : alive) {
             NeedsComponent n = e.get(NeedsComponent.class);
-            n.hunger = Math.max(0, n.hunger - 15f);
+            n.hunger = Math.max(0, n.hunger - 0.15f);
         }
-        log("EVENT: Heat wave! All colonists lost 15 hunger.");
+        log("EVENT: Heat wave! All colonists lost hunger.");
     }
 
     private void eventMoralBoost(List<Entity> alive) {
+        // With decoupled mood (Pattern 2), this now provides a health/energy bump
         for (Entity e : alive) {
             NeedsComponent n = e.get(NeedsComponent.class);
-            n.mood = Math.min(100, n.mood + 20f);
+            n.energy = Math.min(1f, n.energy + 0.1f);
         }
-        log("EVENT: Beautiful sunset. All colonists gained 20 mood.");
+        log("EVENT: Beautiful sunset. All colonists feel refreshed.");
     }
 
     private void eventFoodSpoilage(World world) {
@@ -87,7 +88,7 @@ public class EventSystem {
     private void eventExhaustion(List<Entity> alive) {
         Entity target = alive.get(random.nextInt(alive.size()));
         NeedsComponent n = target.get(NeedsComponent.class);
-        n.energy = Math.max(0, n.energy - 25f);
+        n.energy = Math.max(0, n.energy - 0.25f);
         IdentityComponent id = target.get(IdentityComponent.class);
         String name = id != null ? id.name : "A colonist";
         log("EVENT: " + name + " feels exhausted! Lost 25 energy.");

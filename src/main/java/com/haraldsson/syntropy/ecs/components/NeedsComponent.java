@@ -1,29 +1,41 @@
 package com.haraldsson.syntropy.ecs.components;
 
 import com.haraldsson.syntropy.ecs.Component;
+import com.haraldsson.syntropy.entities.EnergyCategory;
+import com.haraldsson.syntropy.entities.HungerCategory;
 
+/**
+ * Colonist needs — raw floats 0.0–1.0 internally, exposed as tiered categories.
+ * Mood is NOT stored here — it's calculated by MoodSystem via ThoughtWorkers (Pattern 2).
+ */
 public class NeedsComponent implements Component {
-    public static final float HUNGER_DECAY = 2f;
-    public static final float ENERGY_DECAY = 1.2f;
-    public static final float MOOD_DECAY = 0.5f;
-    public static final float EAT_AMOUNT = 40f;
-    public static final float REST_AMOUNT = 30f;
-    public static final float MOOD_BOOST = 15f;
+    public static final float HUNGER_DECAY = 0.02f;   // per second (0–1 scale)
+    public static final float ENERGY_DECAY = 0.012f;
+    public static final float HEALTH_REGEN = 0.003f;
+    public static final float EAT_AMOUNT = 0.4f;
+    public static final float REST_AMOUNT = 0.3f;
 
-    public float hunger = 100f;
-    public float energy = 100f;
-    public float mood = 100f;
+    // Raw values 0.0–1.0
+    public float hunger = 1f;
+    public float energy = 1f;
+    public float health = 1f;
 
-    public boolean isHungry() { return hunger <= 35f; }
-    public boolean isTired() { return energy <= 25f; }
+    // ── Category accessors (Pattern 1) ──
 
-    public void eat() {
-        hunger = Math.min(100f, hunger + EAT_AMOUNT);
-        mood = Math.min(100f, mood + MOOD_BOOST);
-    }
+    public HungerCategory getHungerCategory() { return HungerCategory.fromLevel(hunger); }
+    public EnergyCategory getEnergyCategory() { return EnergyCategory.fromLevel(energy); }
 
-    public void rest() {
-        energy = Math.min(100f, energy + REST_AMOUNT);
-    }
+    // ── Convenience checks ──
+
+    public boolean isHungry() { return getHungerCategory() == HungerCategory.URGENTLY_HUNGRY || getHungerCategory() == HungerCategory.STARVING; }
+    public boolean isTired() { return getEnergyCategory() == EnergyCategory.EXHAUSTED || getEnergyCategory() == EnergyCategory.COLLAPSED; }
+    public boolean isStarving() { return getHungerCategory() == HungerCategory.STARVING; }
+    public boolean isExhausted() { return getEnergyCategory() == EnergyCategory.COLLAPSED; }
+
+    // ── Actions ──
+
+    public void eat() { hunger = Math.min(1f, hunger + EAT_AMOUNT); }
+    public void rest() { energy = Math.min(1f, energy + REST_AMOUNT); }
+    public void heal(float amount) { health = Math.min(1f, health + amount); }
+    public void damage(float amount) { health = Math.max(0f, health - amount); }
 }
-

@@ -3,6 +3,7 @@ package com.haraldsson.syntropy.world;
 import com.haraldsson.syntropy.ecs.ECSWorld;
 import com.haraldsson.syntropy.ecs.Entity;
 import com.haraldsson.syntropy.ecs.components.*;
+import com.haraldsson.syntropy.entities.ColonistRole;
 import com.haraldsson.syntropy.entities.Item;
 import com.haraldsson.syntropy.entities.ItemType;
 
@@ -66,12 +67,19 @@ public final class WorldGenerator {
         stockpileTile.addItem(new Item(ItemType.FOOD));
         world.setStockpileTile(stockpileTile);
 
-        // Colonists
+        // Leader (player-controlled)
         int[] c1 = findValidTile(tiles, width, height, width / 2, height / 2 + 2);
-        createColonist(ecsWorld, "Ari", 28, c1[0] + 0.5f, c1[1] + 0.5f);
+        createLeader(ecsWorld, "Commander Kael", 30, c1[0] + 0.5f, c1[1] + 0.5f);
 
+        // NPC Colonists
         int[] c2 = findValidTile(tiles, width, height, width / 2 - 1, height / 2 + 2);
-        createColonist(ecsWorld, "Bela", 34, c2[0] + 0.5f, c2[1] + 0.5f);
+        createColonist(ecsWorld, "Ari", 28, c2[0] + 0.5f, c2[1] + 0.5f, ColonistRole.HAULER);
+
+        int[] c3 = findValidTile(tiles, width, height, width / 2 + 1, height / 2 + 2);
+        createColonist(ecsWorld, "Bela", 34, c3[0] + 0.5f, c3[1] + 0.5f, ColonistRole.FARMER);
+
+        int[] c4 = findValidTile(tiles, width, height, width / 2, height / 2 + 3);
+        createColonist(ecsWorld, "Dax", 22, c4[0] + 0.5f, c4[1] + 0.5f, ColonistRole.MINER);
 
         return new GenerationResult(world, ecsWorld);
     }
@@ -85,7 +93,8 @@ public final class WorldGenerator {
         return entity;
     }
 
-    private static Entity createColonist(ECSWorld ecsWorld, String name, int age, float x, float y) {
+    private static Entity createLeader(ECSWorld ecsWorld, String name, int age, float x, float y) {
+        Random rng = new Random();
         Entity entity = ecsWorld.createEntity();
         entity.add(new PositionComponent(x, y));
         entity.add(new IdentityComponent(name, age));
@@ -94,6 +103,33 @@ public final class WorldGenerator {
         entity.add(new AIComponent());
         entity.add(new InventoryComponent());
         entity.add(new SkillsComponent());
+        entity.add(new LeaderComponent());
+        entity.add(new AgingComponent(age, 65 + rng.nextInt(20)));
+        entity.add(new RoleComponent(ColonistRole.IDLE));
+        entity.add(new MoodComponent());
+        entity.add(new WorkSettingsComponent());
+        // Leader AI is disabled — player controls directly
+        entity.get(AIComponent.class).aiDisabled = true;
+        return entity;
+    }
+
+    private static Entity createColonist(ECSWorld ecsWorld, String name, int age, float x, float y, ColonistRole role) {
+        Random rng = new Random();
+        Entity entity = ecsWorld.createEntity();
+        entity.add(new PositionComponent(x, y));
+        entity.add(new IdentityComponent(name, age));
+        entity.add(new NeedsComponent());
+        entity.add(new HealthComponent());
+        entity.add(new AIComponent());
+        entity.add(new InventoryComponent());
+        entity.add(new SkillsComponent());
+        entity.add(new AgingComponent(age, 60 + rng.nextInt(25)));
+        entity.add(new RoleComponent(role));
+        entity.add(new MoodComponent());
+        WorkSettingsComponent ws = new WorkSettingsComponent();
+        ws.setPriority(role, 3); // default priority for assigned role
+        ws.setPriority(ColonistRole.HAULER, 2); // everyone hauls at low priority
+        entity.add(ws);
         return entity;
     }
 

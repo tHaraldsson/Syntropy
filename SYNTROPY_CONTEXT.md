@@ -1,67 +1,522 @@
-Project Vision: Syntropy
-Syntropy is a Java-based, 2D colony automation-survival simulation game, inspired by Factorio and RimWorld. Players automate resource chains, manage evolving needs and relationships of colonists, build and optimize their colony, and defend against threats—all while shaping emergent stories.
+# Project Vision: Syntropy
 
-Unique Twist: Player Possession Mechanic
-Unlike traditional simulations, Syntropy lets you "possess" any colonist at any time by pressing a key. While possessing, you directly control that colonist with WASD, disabling their AI, while the rest of the colony continues on autopilot. You can seamlessly swap between direct action and high-level management, blending hands-on play with deep simulation.
+Syntropy is a Java-based, 2D colony automation-survival simulation game inspired by Factorio, RimWorld, and the Bobiverse book series. The player controls a single leader character who guides a growing colony of NPC colonists, automates resource chains, manages an evolving civilization, and ultimately spreads humanity across the stars — all while grappling with the environmental consequences of unchecked expansion.
 
-Tech Stack
-Language: Java 17
-Engine: LibGDX (2D rendering, input)
-Build: Gradle
-Architecture: Modular Entity-Component-System (ECS)
-Package & System Architecture
-core: Game loop, world management, time, saving/loading
-entities: Colonist, Building, Item, Robot, and other core game objects
-systems: Automation, needs/mood, social/relationships, combat, events, research
-world: Chunk, Tile, WorldGenerator (procedural Perlin noise)
-ui: Screens, HUD, tooltips, notifications
-input: Possession controls, camera, selection
-Key Class Responsibilities
-Colonist: Holds metadata (name, age), needs (hunger, energy, mood), skills, relationships, inventory, AI state, and possession flag. update() method manages needs, tasks, and switches input modes.
-Building / Miner: Abstract base for all buildings; handles position, rotation, input/output buffers, construction status, and update logic. Miner produces stone periodically for hauling.
-Tile: Stores terrain/resource types, quantities, and references to buildings/colonists/items at a location.
-World: 2D array of Tiles, chunked for performance.
-PlayerController: Handles the possession mechanic, toggling WASD control and AI states for colonists.
-TaskSystem: Assigns and prioritizes jobs such as hauling, eating, and working for unpossessed colonists.
-Core Gameplay Loop
-Manage: Oversee colonists, assign goals, optimize layouts
-Automate: Build and improve supply chains (mining, hauling, storage)
-Possess: Press 'P' to control a colonist directly at any time for fine-grained action
-Survive: Manage needs, defend from threats, adapt to random events
-Expand: Research, build, and face more complex colony challenges over time
-MVP Feature Set
-Renders a 10x10 tile grid
-Includes at least one colonist (rectangle), movable by AI (random wandering) or WASD possession
-One building (“Miner”) produces stone
-Colonist hauls stone from miner to stockpile
-Simple hunger mechanic — hunger decreases over time, colonist seeks/eats food
-Next Steps
-After completing the MVP, Syntropy’s development should continue in the following areas:
+The core narrative arc: **Survive → Automate → Expand → Cause Problems → Solve Them or Escape → Repeat on a New World.**
 
-1. Polish and Bugfix MVP
-   Thorough playtesting for stability and retention of gameplay flow
-   Fix bugs in core loop: possession, AI, hauling, and needs
-2. UI/UX Improvements
-   Add visual indicators for colonist needs (e.g., hunger/mood bars)
-   HUD for resource counters, colonist lists, and active possession
-   Input feedback (highlight possessed colonist, prompts, tooltips)
-3. Save & Load System
-   Implement saving/loading of world and entity state (suggest JSON for MVP)
-   Enables persistent colonies and faster iteration
-4. Expand Gameplay Features
-   Job System: Multiple concurrent tasks, job priorities, advanced stockpile logic
-   Research & Progression: Simple tech tree and new building unlocks (e.g., conveyor belts, smelters)
-   Additional Buildings: More automation options or logistics support (e.g., assembler, food grower)
-   World Expansion: Larger or procedurally generated worlds, new resources
-   Threats & Events: Randomized events and basic combat
-   Social/Story: Simple relationships, events, and emergent stories
-5. Refine ECS & Modular Design
-   Extract and document ECS components for scalability
-   Ensure new features follow ECS best practices
-6. Documentation & Planning
-   Update README and in-code docs to reflect new systems and features
-   Create a GitHub Project board for task tracking and future planning
-7. Gather Feedback
-   Share for early playtesting and feedback from users or developers
-   Prioritize enhancements and fixes based on user experience
-   Syntropy fuses deep colony AI, direct player control, robust automation, and emergent storytelling—built on a clean, scalable Java ECS foundation and ready to grow.
+---
+
+## Tech Stack
+- **Language:** Java 17
+- **Engine:** LibGDX (2D rendering, input)
+- **Build:** Gradle
+- **Architecture:** Modular Entity-Component-System (ECS)
+- **Networking (future):** KryoNet
+
+---
+
+## Package & System Architecture
+- `core` — Game loop, world management, time, saving/loading, event bus
+- `entities` — Leader, Colonist, Child, Robot (Worker/Android), Building, Item
+- `systems` — Needs, mood, AI/think tree, automation, pollution, research, combat, diplomacy, dynasty
+- `world` — Chunk, Tile, WorldGenerator (procedural Perlin noise), biome, pollution map
+- `ui` — Screens, HUD, colonist bar, tooltips, notifications, planet manager
+- `input` — Leader controls, camera, selection, blueprint placement
+- `factions` — Faction data, diplomacy state, relations, ideology
+
+---
+
+## The Player — The Leader
+
+The player controls **one single character**: the colony's leader. There is no possession-swapping. The leader IS the player.
+
+### Leader Properties
+- Has **stats**: charisma, engineering, science, combat — each affects colony efficiency
+- **Ages in real time** relative to game progression (~60–80 in-game years lifespan)
+- **Can be killed** by enemies, disasters, or accidents
+- On death (natural or otherwise) → player **chooses a successor** from existing colonists
+- Successors **inherit some stats** from the previous leader (especially if they are a child)
+- This creates a **dynasty system** — your legacy is the colony, not just one life
+- **No true game over** unless the entire colony is wiped out
+
+---
+
+## Colonists (NPCs)
+
+Colonists are autonomous NPCs driven by an AI think tree. The player does not directly control them.
+
+### Colonist Properties
+- **Needs:** hunger, sleep, happiness, health
+- **Jobs/Roles:** farmer, miner, medic, engineer, scientist, soldier, builder
+- **Recruitment:** arrive naturally over time, attracted by colony size/reputation, or born
+- **Children:** colonists form relationships and have children who grow up over time
+- **Trait inheritance:** children inherit traits from parents (skills, personality)
+- This creates emergent **dynasty and bloodline** mechanics
+
+### Job Assignment Progression
+1. Player assigns roles manually (like RimWorld work priorities)
+2. **Blueprint automation** — place a blueprint in storage, colonists sense and build automatically
+3. **Learned crafting** — experienced colonists craft buildings from raw resources without blueprints
+4. Colonists improve at their jobs over time (skill progression)
+
+---
+
+## Robots
+
+Two distinct tiers of robots, unlocked through research:
+
+### Tier 1 — Worker Bots (Factorio-style)
+- Purely functional: carry, build, mine, haul
+- Powered by solar/battery — low pollution
+- No needs, no social layer
+- Cheap and mass-produceable
+- Cannot do complex tasks (research, medicine, diplomacy)
+
+### Tier 2 — Android Colonists (Hybrid)
+- Can perform complex tasks like humans
+- Require **charging stations** → produce **pollution/waste**
+- Limited in number due to environmental cost
+- Much faster builders and workers than humans
+- The tradeoff: powerful but environmentally costly
+
+**Design tension:** Androids are efficient but accelerate the global pollution meter. This is intentional.
+
+---
+
+## Automation & Building Progression
+
+1. **Manual** — player and colonists build everything by hand
+2. **Blueprint system** — player places blueprints in storage; colonists retrieve and construct
+3. **Learned crafting** — experienced colonists craft from raw resources automatically
+4. **Bot automation** — Worker Bots handle all logistics (Factorio-style)
+5. **Android construction** — Androids build at high speed but increase pollution
+
+---
+
+## Eco-Friendly vs Industrial Machines
+
+Every major machine type has two variants:
+
+| | Industrial | Eco-Friendly |
+|---|---|---|
+| Output | High | Lower |
+| Speed | Fast | Slower |
+| Pollution | High | Minimal |
+| Cost | Cheaper | More expensive |
+| Unlock | Early | Later (research) |
+
+---
+
+## Pollution & Environment System
+
+### Regional Pollution
+- Each map region has a local pollution level
+- Heavy industry in one area devastates that biome
+- Forests stop growing and die
+- Colonists in polluted areas get health/mood debuffs
+- Spreading industry across regions delays local collapse
+
+### Global Pollution (Planetary Health Meter)
+- All colonies on the planet (including rival factions) contribute to a global meter
+- Even if YOU are eco-friendly, a neighbor industrializing can doom the planet
+- As meter rises: crop failures, extreme weather, health crises, ecosystem collapse
+- At critical levels: planet becomes uninhabitable → must expand to space
+
+### Consequences
+- Forests die and do not regrow
+- Colonist mood and health debuffs in polluted zones
+- Crop yield reduction
+- Eventually: uninhabitable zones expand across the map
+
+---
+
+## Factions & Diplomacy
+
+Other colonies exist on the planet with their own ideologies.
+
+### Faction Types
+- **Eco colonies** — sustainable, slow growth, friendly
+- **Industrial colonies** — fast expansion, high pollution, aggressive
+- **Hostile factions** — raiders, pirates, competitors
+
+### Diplomacy Options
+- Trade, Alliance, Annexation by diplomacy, Annexation by force, Coexistence
+
+### Key Mechanic
+Rival faction pollution contributes to the global meter. You may need to stop a neighbor — by diplomacy or force — to save the planet. Moral dilemmas are intentional.
+
+---
+
+## Research Eras
+
+### Era 1 — Survival
+Basic farming, mining, storage, simple buildings, colonist needs management
+
+### Era 2 — Automation
+Blueprints, basic bots, conveyor systems, improved farming, early medicine
+
+### Era 3 — Industrial
+Advanced machines, androids, eco-friendly alternatives, pollution management, diplomacy
+
+### Era 4 — Space
+Rocketry, off-world communication, terraforming probe, multi-colony management
+
+### Era 5 — Legacy
+Advanced terraforming, inter-colony networks, planetary stewardship, new world colonization
+
+---
+
+## Space Expansion & Multi-Colony Management
+
+### Multiple Colonies
+- Player manages multiple colonies simultaneously
+- Switch between colonies instantly (tab/map view)
+- Each colony runs in real time — automation is critical
+- Colonies can trade resources and share research
+
+### Terraforming Probe (Bobiverse-inspired)
+- Built on current planet before departure
+- Player controls the probe directly as a **second gameplay mode**
+- Probe must automate: oxygen generation, temperature regulation, soil preparation
+- Probe gameplay: place machines, automate processes, prepare world for human arrival
+- Once terraformed sufficiently → colonists can be sent
+
+### Planet Hopping
+- Leaving a planet does not mean abandoning it
+- Bring key resources and technology with you
+- Both colonies managed simultaneously in real time
+- The old planet may still be dying — watch it collapse while building anew
+
+---
+
+## AI System — Think Tree
+
+Colonist AI uses a **priority-based think tree**. Each node returns a priority float. Highest valid priority wins.
+
+### Think Node Chain (priority order)
+1. `ReactToEmergency` — fire, attack, injury (priority: 999)
+2. `EatIfStarving` — seek food if hunger critical (priority: 100)
+3. `SleepIfExhausted` — rest if energy critical (priority: 80)
+4. `DoAssignedJob` — perform assigned role (priority: 50)
+5. `ExecuteBlueprint` — pick up and place blueprints (priority: 30)
+6. `Socialize` — interact with colonists if needs met (priority: 10)
+7. `Wander` — idle behavior (priority: 1)
+
+---
+
+## Design Patterns & Reference Implementations
+
+These are original Java patterns written for Syntropy, derived from studying
+RimWorld and Factorio design concepts. No code has been copied — all is original.
+
+### Pattern 1 — Tiered Needs (HungerCategory)
+Instead of tracking hunger as a raw float, derive a named category from it.
+Each category drives different AI priority, speed, efficiency, and mood offsets.
+
+```java
+public enum HungerCategory {
+    FED, HUNGRY, URGENTLY_HUNGRY, STARVING;
+
+    public static HungerCategory fromLevel(float level) {
+        if (level > 0.6f) return FED;
+        if (level > 0.3f) return HUNGRY;
+        if (level > 0.1f) return URGENTLY_HUNGRY;
+        return STARVING;
+    }
+}
+
+// Same pattern applies to energy:
+public enum EnergyCategory {
+    RESTED, TIRED, EXHAUSTED, COLLAPSED;
+
+    public static EnergyCategory fromLevel(float level) {
+        if (level > 0.6f) return RESTED;
+        if (level > 0.3f) return TIRED;
+        if (level > 0.1f) return EXHAUSTED;
+        return COLLAPSED;
+    }
+}
+```
+
+### Pattern 2 — Decoupled Mood System
+Needs NEVER touch mood directly. ThoughtWorkers observe need state
+and inject mood modifiers. Keeps all systems independent and extensible.
+
+```java
+public interface ThoughtWorker {
+    float getMoodOffset(Colonist c);
+}
+
+public class HungerThoughtWorker implements ThoughtWorker {
+    public float getMoodOffset(Colonist c) {
+        return switch (c.getHungerCategory()) {
+            case FED            ->   0f;
+            case HUNGRY         ->  -5f;
+            case URGENTLY_HUNGRY-> -15f;
+            case STARVING       -> -40f;
+        };
+    }
+}
+
+public class MoodSystem {
+    private final List<ThoughtWorker> workers = List.of(
+        new HungerThoughtWorker(),
+        new SleepThoughtWorker(),
+        new SocialThoughtWorker()
+        // add more without touching existing code
+    );
+
+    public float calculateMood(Colonist c) {
+        return workers.stream()
+            .mapToFloat(w -> w.getMoodOffset(c))
+            .sum();
+    }
+}
+```
+
+### Pattern 3 — Think Tree AI
+Colonist AI is a chain of ThinkNodes. Highest priority valid node wins each tick.
+
+```java
+public interface ThinkNode {
+    float getPriority(Colonist c);
+    Task tryIssueTask(Colonist c);  // returns null if cannot issue
+}
+
+public class ThinkNode_EatIfStarving implements ThinkNode {
+    public float getPriority(Colonist c) {
+        return switch (c.getHungerCategory()) {
+            case STARVING        -> 100f;
+            case URGENTLY_HUNGRY ->  70f;
+            default              ->   0f;
+        };
+    }
+
+    public Task tryIssueTask(Colonist c) {
+        Food food = c.getWorld().findNearestFood(c.getPosition());
+        return food != null ? new EatTask(c, food) : null;
+    }
+}
+
+public class ColonistAI {
+    private final List<ThinkNode> nodes = List.of(
+        new ThinkNode_ReactToEmergency(),
+        new ThinkNode_EatIfStarving(),
+        new ThinkNode_SleepIfExhausted(),
+        new ThinkNode_DoAssignedJob(),
+        new ThinkNode_ExecuteBlueprint(),
+        new ThinkNode_Socialize(),
+        new ThinkNode_Wander()
+    );
+
+    public void tick(Colonist c) {
+        nodes.stream()
+            .filter(n -> n.getPriority(c) > 0)
+            .max(Comparator.comparingDouble(n -> n.getPriority(c)))
+            .map(n -> n.tryIssueTask(c))
+            .filter(Objects::nonNull)
+            .ifPresent(c::assignTask);
+    }
+}
+```
+
+### Pattern 4 — Event Bus
+Systems never call each other directly. All communication goes through events.
+This keeps systems decoupled and makes multiplayer/save-load much easier.
+
+```java
+public enum EventType {
+    RESOURCE_PRODUCED,
+    RESOURCE_CONSUMED,
+    COLONIST_DIED,
+    COLONIST_BORN,
+    POLLUTION_INCREASED,
+    BUILDING_PLACED,
+    RESEARCH_COMPLETED,
+    LEADER_DIED,
+    FACTION_RELATION_CHANGED
+}
+
+public class GameEvents {
+    private static final Map<EventType, List<Consumer<Object>>> listeners = new HashMap<>();
+
+    public static void on(EventType type, Consumer<Object> listener) {
+        listeners.computeIfAbsent(type, k -> new ArrayList<>()).add(listener);
+    }
+
+    public static void fire(EventType type, Object payload) {
+        listeners.getOrDefault(type, List.of())
+            .forEach(l -> l.accept(payload));
+    }
+}
+
+// Usage — firing:
+GameEvents.fire(EventType.RESOURCE_PRODUCED, new ResourcePayload(ResourceType.STONE, 10));
+
+// Usage — subscribing:
+GameEvents.on(EventType.RESOURCE_PRODUCED, payload -> {
+    ResourcePayload p = (ResourcePayload) payload;
+    pollutionSystem.onResourceProduced(p);
+    storageSystem.onResourceProduced(p);
+});
+```
+
+### Pattern 5 — Serializable GameState Root Object
+ALL game state lives in one root object. No statics, no singletons for game data.
+This is the foundation for save/load AND future multiplayer.
+
+```java
+public class GameState {
+    public World world;
+    public Leader leader;
+    public List<Colonist> colonists;
+    public List<Robot> robots;
+    public List<Faction> factions;
+    public PollutionData pollution;
+    public ResearchState research;
+    public List<Colony> colonies;       // for multi-planet
+    public DynastyHistory dynasty;      // leader succession history
+    // Serialized via Gson — everything must be serializable
+}
+
+// Save:
+String json = new Gson().toJson(gameState);
+Files.writeString(Path.of("save.json"), json);
+
+// Load:
+GameState gameState = new Gson().fromJson(json, GameState.class);
+```
+
+### Pattern 6 — Per-Colonist Work Priority Settings
+Each colonist has their own job priorities (1–4 scale, 0 = disabled).
+Used by the ThinkNode_DoAssignedJob node to pick the right task.
+
+```java
+public class WorkSettings {
+    private final Map<JobType, Integer> priorities = new HashMap<>();
+
+    public void setPriority(JobType job, int priority) {
+        if (priority < 0 || priority > 4)
+            throw new IllegalArgumentException("Priority must be 0–4");
+        priorities.put(job, priority);
+    }
+
+    public int getPriority(JobType job) {
+        return priorities.getOrDefault(job, 0);
+    }
+
+    public List<JobType> getActiveJobsSorted() {
+        return priorities.entrySet().stream()
+            .filter(e -> e.getValue() > 0)
+            .sorted(Map.Entry.<JobType, Integer>comparingByValue().reversed())
+            .map(Map.Entry::getKey)
+            .toList();
+    }
+}
+```
+
+### Pattern 7 — HUD Colonist Bar
+Each colonist in the HUD bar shows a portrait + status icons.
+Status is derived from current AI state and needs — never stored separately.
+
+```java
+public enum ColonistStatus {
+    IDLE, EATING, SLEEPING, WORKING, FLEEING, ATTACKING, INJURED
+}
+
+public class ColonistBarEntry {
+    private final Colonist colonist;
+
+    public ColonistStatus getStatus() {
+        if (colonist.isInCombat())        return ColonistStatus.ATTACKING;
+        if (colonist.isFleeing())         return ColonistStatus.FLEEING;
+        if (colonist.isInjured())         return ColonistStatus.INJURED;
+        if (colonist.isSleeping())        return ColonistStatus.SLEEPING;
+        if (colonist.isEating())          return ColonistStatus.EATING;
+        if (colonist.hasActiveJob())      return ColonistStatus.WORKING;
+        return ColonistStatus.IDLE;
+    }
+
+    public void render(SpriteBatch batch, float x, float y) {
+        // Draw portrait
+        batch.draw(colonist.getPortraitTexture(), x, y, 32, 32);
+        // Draw status icon on top
+        batch.draw(getStatusIcon(), x + 20, y + 20, 12, 12);
+        // Draw hunger bar below
+        renderNeedBar(batch, x, y - 6, colonist.getHunger(), Color.ORANGE);
+        // Draw energy bar below hunger
+        renderNeedBar(batch, x, y - 12, colonist.getEnergy(), Color.CYAN);
+    }
+}
+```
+
+---
+
+## Architecture Rules (Non-Negotiable)
+
+1. **No static game state** — all world/entity/faction data lives in `GameState`
+2. **No singletons for game data** — pass `GameState` explicitly or use dependency injection
+3. **ECS components must be serializable** — use Gson-compatible types only
+4. **All inter-system communication via event bus** — no direct system-to-system calls
+5. **Multiplayer-ready from day one** — KryoNet when implemented; architecture must support it now
+
+---
+
+## Current Development Status (as of 2026-02-20)
+
+### Completed ✅
+- MVP: 30x30 tile grid (simplex noise terrain), colonist movement, miner/food grower buildings, hauling, hunger mechanic
+- Factorio-inspired procedural sprite rendering (SpriteManager — textured terrain, industrial buildings, humanoid colonists, item icons)
+- Scene2D HUD (GameHud — resource counters, colonist list, leader info, event log, controls, status messages)
+- Save/Load system (full ECS serialization — all components, tiles, buildings, entities)
+- Permanent leader character — WASD movement, camera follow, E to pickup/drop, no possession swapping
+- Leader stats: charisma, engineering, science, combat (affects colony efficiency, research, diplomacy)
+- **Pattern 1 — Tiered Needs:** `HungerCategory` (FED/HUNGRY/URGENTLY_HUNGRY/STARVING), `EnergyCategory` (RESTED/TIRED/EXHAUSTED/COLLAPSED). Needs on 0.0–1.0 scale.
+- **Pattern 2 — Decoupled Mood System:** `MoodComponent` separate from needs. `ThoughtWorker` interface + `HungerThoughtWorker`, `SleepThoughtWorker`, `HealthThoughtWorker`. `MoodSystem` calculates mood as sum of all ThoughtWorker offsets.
+- **Pattern 3 — Think Tree AI:** `ThinkNode` base class with `getPriority()` + `execute()`. `ThinkTreeRoot` picks highest-priority node. Implemented nodes: `ThinkNode_EatFood` (priority 100), `ThinkNode_Rest` (priority 80), `ThinkNode_Haul` (priority 50), `ThinkNode_Wander` (priority 1). `AITaskSystem` skips leader entity.
+- **Pattern 4 — Event Bus:** `GameEvents` class with `EventType` enum, `on()`/`fire()`/`fireAndLog()`. Instance-based (not static). Lives in `GameState`.
+- **Pattern 5 — GameState Root Object:** `GameState` class holding `World`, `ECSWorld`, `GameEvents`, `ResearchSystem`, `PollutionSystem`, dynasty tracking. No statics for game data.
+- **Pattern 6 — Per-Colonist Work Priorities:** `WorkSettingsComponent` with `Map<ColonistRole, Integer>` priorities (0–4 scale). `getActiveJobsSorted()` for Think Tree.
+- Global pollution system (`PollutionSystem` — building pollution rates, natural decay, colonist health debuffs, severity labels)
+- Aging system (`AgingComponent` + `AgingSystem` — real-time aging, natural death, leader succession with stat inheritance)
+- Dynasty/succession (auto-promotes first eligible colonist on leader death — TODO: player choice UI)
+- Colonist roles (`ColonistRole` enum + `RoleComponent`)
+- Random event system (heat waves, food blessings, exhaustion events)
+- Basic research system (4 techs — needs expansion to 5 eras)
+- `.gitignore` for save files
+- **GameState root wired into GameApp** — all systems reference `gameState.world`, `gameState.ecsWorld`, `gameState.pollution`, `gameState.research`
+- **Event bus wired** — `GameEvents` fires `COLONIST_DIED`, `LEADER_DIED`, `LEADER_SUCCEEDED`, `RESEARCH_COMPLETED`, `BUILDING_COMPLETED` events. Listeners log to event bus.
+- **ThinkNode_DoAssignedJob** — uses `WorkSettingsComponent` priorities (Pattern 6). Colonists perform their assigned role (HAULER, MINER, FARMER) based on priority settings.
+- **ThinkNode_Socialize** — colonists seek out nearby colonists to socialize when needs are met (priority 10). Foundation for SocialThoughtWorker mood boost.
+- **Think Tree now has 6 nodes:** EatFood (100), Rest (80), DoAssignedJob (50), Haul (50), Socialize (10), Wander (1)
+- `HealthComponent.deathEventFired` flag — prevents duplicate death events
+
+### Current Focus 🔨
+- Add `ThinkNode_ReactToEmergency` (fire, attack, injury — priority 999). Needs combat/threat system first.
+- HUD: colonist bar with portraits + status icons (Pattern 7 — not yet implemented)
+- Successor selection UI (currently auto-picks — context says player should choose)
+- Add `SocialThoughtWorker` to MoodSystem (mood boost when socializing)
+- Wire event bus into BuildingProductionSystem (fire RESOURCE_PRODUCED)
+- Wire event bus into ResearchSystem (fire RESEARCH_COMPLETED)
+
+### Near-Term Goals 📋
+- Basic faction system (at least one rival AI colony contributing to global pollution)
+- Regional pollution (per-tile pollution levels, biome degradation)
+- Blueprint placement system (place ghost → colonists auto-build)
+- Eco-friendly vs industrial building variants
+- Research era system (5 eras with prerequisites, replacing flat 4-tech tree)
+
+### Future Goals 🚀
+- Children and trait inheritance (colonist relationships, bloodlines)
+- Robot tiers (Worker Bots + Androids with pollution tradeoff)
+- Diplomacy system (trade, alliance, annexation)
+- Space expansion + terraforming probe gameplay
+- Multi-colony management (tab between colonies)
+- Multiplayer (KryoNet)
+
+### Open Questions ❓
+1. **Successor selection UI:** Should this be a pause screen with a list of candidates + stats, or a simple popup? What info should be shown per candidate?
+2. ~~**Event bus wiring:**~~ **RESOLVED** — `GameEvents` is instance-based, lives in `GameState`, passed implicitly through `gameState.events`. Systems access it through GameState.
+3. **Regional pollution granularity:** Per-tile or per-chunk (e.g., 5x5 tile regions)?
+4. **Research eras:** Should techs within an era be researchable in any order, or strictly linear?
+5. **Combat system:** What triggers `ThinkNode_ReactToEmergency`? Do we need hostile entities first, or can we start with natural disasters (fire)?

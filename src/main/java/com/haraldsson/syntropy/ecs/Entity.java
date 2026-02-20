@@ -1,5 +1,6 @@
 package com.haraldsson.syntropy.ecs;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -36,6 +37,10 @@ public class Entity {
 
     public void remove(Class<? extends Component> type) {
         components.remove(type);
+    }
+
+    public Map<Class<? extends Component>, Component> getComponents() {
+        return Collections.unmodifiableMap(components);
     }
 
     public static void resetIdCounter() {

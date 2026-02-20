@@ -3,12 +3,15 @@ package com.haraldsson.syntropy.input;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.OrthographicCamera;
+import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.utils.viewport.Viewport;
 import com.haraldsson.syntropy.ecs.ECSWorld;
 import com.haraldsson.syntropy.ecs.Entity;
 import com.haraldsson.syntropy.ecs.components.*;
 import com.haraldsson.syntropy.entities.Item;
+import com.haraldsson.syntropy.entities.ItemType;
 import com.haraldsson.syntropy.world.Tile;
+import com.haraldsson.syntropy.world.TerrainType;
 import com.haraldsson.syntropy.world.World;
 
 /**
@@ -29,6 +32,7 @@ public class PlayerController {
     private Entity leader; // cached reference
     private String pickupMessage = "";
     private float pickupMessageTimer;
+    private boolean buildModeActive = false;
 
     public PlayerController(World world, ECSWorld ecsWorld, OrthographicCamera camera, Viewport viewport, int tileSize) {
         this.world = world;
@@ -60,6 +64,7 @@ public class PlayerController {
             }
             handleLeaderMovement(delta);
             handlePickup();
+            handleBuildMode();
             updateCameraFollow();
         } else {
             handleCameraPan(delta);
@@ -74,6 +79,8 @@ public class PlayerController {
     public String getPickupMessage() {
         return pickupMessageTimer > 0 ? pickupMessage : "";
     }
+
+    public boolean getBuildModeActive() { return buildModeActive; }
 
     private void handleLeaderMovement(float delta) {
         PositionComponent pos = leader.get(PositionComponent.class);
@@ -141,6 +148,54 @@ public class PlayerController {
         }
 
         showPickupMessage("Nothing nearby");
+    }
+
+    private void handleBuildMode() {
+        if (Gdx.input.isKeyJustPressed(Input.Keys.B)) {
+            buildModeActive = !buildModeActive;
+        }
+
+        if (buildModeActive && Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
+            Vector3 worldCoords = camera.unproject(new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0));
+            int tileX = (int)(worldCoords.x / tileSize);
+            int tileY = (int)(worldCoords.y / tileSize);
+            tryPlaceBed(tileX, tileY);
+        }
+    }
+
+    private void tryPlaceBed(int tileX, int tileY) {
+        Tile tile = world.getTile(tileX, tileY);
+        if (tile == null) return;
+
+        // Must be GRASS or DIRT
+        TerrainType t = tile.getTerrainType();
+        if (t != TerrainType.GRASS && t != TerrainType.DIRT) return;
+
+        // Must not already have a building or bed
+        if (tile.getBuildingEntity() != null) return;
+
+        // Must have 3 wood in stockpile
+        Tile stockpile = world.getStockpileTile();
+        if (stockpile == null) return;
+        int woodCount = stockpile.countItems(ItemType.WOOD);
+        if (woodCount < 3) {
+            showPickupMessage("Need 3 Wood to place bed");
+            return;
+        }
+
+        // Deduct 3 wood
+        for (int i = 0; i < 3; i++) {
+            stockpile.takeFirstItem(ItemType.WOOD);
+        }
+
+        // Place bed entity
+        Entity bedEntity = ecsWorld.createEntity();
+        bedEntity.add(new PositionComponent(tileX, tileY));
+        bedEntity.add(new BedComponent());
+        tile.setBuildingEntity(bedEntity);
+
+        showPickupMessage("Bed placed!");
+        buildModeActive = false; // exit build mode after placing
     }
 
     private void showPickupMessage(String msg) {

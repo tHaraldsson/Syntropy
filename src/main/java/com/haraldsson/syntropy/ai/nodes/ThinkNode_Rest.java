@@ -10,9 +10,10 @@ import com.haraldsson.syntropy.world.World;
 
 /**
  * Rest when energy is low. Priority scales with exhaustion.
+ * Prefers sleeping in an owned bed; falls back to sleeping on the ground.
  */
 public class ThinkNode_Rest extends ThinkNode {
-    private static final float REST_DURATION = 3f;
+    private static final float REST_DURATION = 4f;
 
     @Override
     public float getPriority(Entity entity, ECSWorld ecsWorld, World world) {
@@ -39,8 +40,29 @@ public class ThinkNode_Rest extends ThinkNode {
             ai.setTask(TaskType.RESTING, (int) pos.x, (int) pos.y);
             ai.resetWanderCooldown(REST_DURATION);
         }
+
         if (ai.shouldPickNewWanderTarget(delta)) {
-            needs.rest();
+            // Find owned bed
+            Entity ownedBed = null;
+            for (Entity bedEntity : ecsWorld.getEntitiesWith(BedComponent.class)) {
+                BedComponent bed = bedEntity.get(BedComponent.class);
+                if (bed.ownerEntityId == entity.getId()) {
+                    ownedBed = bedEntity;
+                    break;
+                }
+            }
+
+            SleepQualityComponent sq = entity.get(SleepQualityComponent.class);
+            if (ownedBed != null) {
+                // Sleep in bed — full rest
+                needs.rest();
+                if (sq != null) sq.lastSleepQuality = SleepQualityComponent.Quality.IN_BED;
+            } else {
+                // Sleep on ground — half rest
+                needs.restPartial(NeedsComponent.REST_AMOUNT * 0.5f);
+                if (sq != null) sq.lastSleepQuality = SleepQualityComponent.Quality.ON_GROUND;
+            }
+
             ai.clearTask();
             return false;
         }

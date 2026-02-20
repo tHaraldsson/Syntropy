@@ -85,7 +85,30 @@ public final class WorldGenerator {
         int[] c4 = findValidTile(tiles, width, height, width / 2, height / 2 + 3);
         createColonist(ecsWorld, "Dax", 22, c4[0] + 0.5f, c4[1] + 0.5f, ColonistRole.MINER);
 
+        assignBedsToColonists(ecsWorld);
+
         return new GenerationResult(world, ecsWorld);
+    }
+
+    private static void assignBedsToColonists(ECSWorld ecsWorld) {
+        java.util.List<Entity> unownedBeds = new java.util.ArrayList<>();
+        for (Entity bedEntity : ecsWorld.getEntitiesWith(BedComponent.class)) {
+            BedComponent bed = bedEntity.get(BedComponent.class);
+            if (bed.ownerEntityId == -1) {
+                unownedBeds.add(bedEntity);
+            }
+        }
+        if (unownedBeds.isEmpty()) return;
+
+        int bedIndex = 0;
+        for (Entity colonist : ecsWorld.getEntitiesWith(AIComponent.class)) {
+            if (bedIndex >= unownedBeds.size()) break;
+            AIComponent ai = colonist.get(AIComponent.class);
+            if (!ai.aiDisabled) {
+                Entity bedEntity = unownedBeds.get(bedIndex++);
+                bedEntity.get(BedComponent.class).ownerEntityId = colonist.getId();
+            }
+        }
     }
 
     private static Entity createBuilding(ECSWorld ecsWorld, World world, Tile[][] tiles,

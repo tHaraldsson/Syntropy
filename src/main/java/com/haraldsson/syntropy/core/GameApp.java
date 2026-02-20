@@ -368,7 +368,7 @@ public class GameApp extends ApplicationAdapter {
             float barY = cy + TILE_SIZE - 6;
             float barWidth = TILE_SIZE - 16;
             drawBar(cx + 8, barY, barWidth, needs.hunger, 0.2f, 0.8f, 0.3f);
-            drawBar(cx + 8, barY - 5, barWidth, needs.energy, 0.3f, 0.5f, 0.9f);
+            drawBar(cx + 8, barY - 5, barWidth, needs.health, 0.9f, 0.2f, 0.2f);
             MoodComponent moodComp = e.get(MoodComponent.class);
             float moodRatio = moodComp != null ? moodComp.mood / 100f : 0.5f;
             drawBar(cx + 8, barY - 10, barWidth, moodRatio, 0.9f, 0.8f, 0.2f);

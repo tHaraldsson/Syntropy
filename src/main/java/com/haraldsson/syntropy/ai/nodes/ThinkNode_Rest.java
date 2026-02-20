@@ -13,7 +13,7 @@ import com.haraldsson.syntropy.world.World;
  * Prefers sleeping in an owned bed; falls back to sleeping on the ground.
  */
 public class ThinkNode_Rest extends ThinkNode {
-    private static final float REST_DURATION = 3f;
+    private static final float REST_DURATION = 4f;
 
     @Override
     public float getPriority(Entity entity, ECSWorld ecsWorld, World world) {

@@ -91,9 +91,21 @@ public class GameHud {
         eventLogLabel.setColor(0.9f, 0.7f, 0.3f, 1f);
         bottomRow.add(eventLogLabel).left().expandX().fillX().row();
 
+        // Controls
+        controlsLabel = new Label("[WASD] Move Leader  [E] Pickup/Drop  [R] Research  [B] Build Mode  [Scroll] Zoom  [F5] Save  [F9] Load", skin, "small");
+        controlsLabel.setColor(0.6f, 0.6f, 0.6f, 1f);
+        bottomRow.add(controlsLabel).left().expandX().fillX().row();
+
         root.add(bottomRow).bottom().left().fillX().row();
 
-        // Build mode label (centered, overlaid)
+        // Status (centered, overlaid)
+        statusLabel = new Label("", skin, "hud-bold");
+        statusLabel.setColor(Color.YELLOW);
+        statusLabel.setAlignment(Align.center);
+        statusLabel.setPosition(0, 0);
+        stage.addActor(statusLabel);
+
+        // Build mode label (centered, below status)
         buildModeLabel = new Label("", skin, "hud-bold");
         buildModeLabel.setColor(Color.YELLOW);
         buildModeLabel.setAlignment(Align.center);
@@ -150,6 +162,21 @@ public class GameHud {
             totalWood = stockpile.countItems(ItemType.WOOD);
         }
         resourceLabel.setText("Stockpile  Stone: " + totalStone + "  Food: " + totalFood + "  Wood: " + totalWood);
+
+        // Buildings
+        StringBuilder bldg = new StringBuilder();
+        int minerIdx = 1, growerIdx = 1, woodcutterIdx = 1;
+        for (Entity e : ecsWorld.getEntitiesWith(BuildingComponent.class)) {
+            BuildingComponent bc = e.get(BuildingComponent.class);
+            if ("MINER".equals(bc.buildingType)) {
+                bldg.append("Miner ").append(minerIdx++).append(" output: ").append(bc.getOutputCount()).append("\n");
+            } else if ("WOODCUTTER".equals(bc.buildingType)) {
+                bldg.append("Woodcutter ").append(woodcutterIdx++).append(" output: ").append(bc.getOutputCount()).append("\n");
+            } else {
+                bldg.append("FoodGrower ").append(growerIdx++).append(" output: ").append(bc.getOutputCount()).append("\n");
+            }
+        }
+        buildingLabel.setText(bldg.toString().trim());
 
         // Colonist list — compact single-line format
         Entity leaderEntity = playerController.getLeader();
@@ -218,6 +245,18 @@ public class GameHud {
         // Pickup message
         String pickupMsg = playerController.getPickupMessage();
         pickupLabel.setText(pickupMsg);
+
+        // Build mode indicator
+        if (playerController.getBuildModeActive()) {
+            buildModeLabel.setText("[BUILD MODE — Click to place Bed (costs 3 Wood) — B to cancel]");
+            buildModeLabel.pack();
+            buildModeLabel.setPosition(
+                    stage.getWidth() / 2f - buildModeLabel.getPrefWidth() / 2f,
+                    stage.getHeight() / 2f
+            );
+        } else {
+            buildModeLabel.setText("");
+        }
 
         // Build mode indicator
         if (playerController.getBuildModeActive()) {

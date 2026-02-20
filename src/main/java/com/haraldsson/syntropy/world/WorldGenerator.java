@@ -113,6 +113,7 @@ public final class WorldGenerator {
         entity.add(new MoodComponent());
         entity.add(new SleepQualityComponent());
         entity.add(new WorkSettingsComponent());
+        entity.add(new SleepQualityComponent());
         // Leader AI is disabled — player controls directly
         entity.get(AIComponent.class).aiDisabled = true;
         return entity;
@@ -136,6 +137,7 @@ public final class WorldGenerator {
         ws.setPriority(role, 3); // default priority for assigned role
         ws.setPriority(ColonistRole.HAULER, 2); // everyone hauls at low priority
         entity.add(ws);
+        entity.add(new SleepQualityComponent());
         return entity;
     }
 

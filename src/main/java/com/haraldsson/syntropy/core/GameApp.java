@@ -104,6 +104,9 @@ public class GameApp extends ApplicationAdapter {
     private void wireEventBus() {
         GameEvents events = gameState.events;
 
+        // Inject events reference into systems that need it
+        buildingProductionSystem.setEvents(events);
+
         events.on(EventType.COLONIST_DIED, payload -> {
             String name = payload instanceof String ? (String) payload : "A colonist";
             events.log("DEATH: " + name + " has died.");

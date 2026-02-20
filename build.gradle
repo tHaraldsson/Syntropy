@@ -1,0 +1,34 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group = 'com.haraldsson'
+version = '1.0-SNAPSHOT'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+application {
+    mainClass = 'com.haraldsson.syntropy.core.GameMain'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'com.badlogicgames.gdx:gdx:1.12.1'
+    implementation 'com.badlogicgames.gdx:gdx-backend-lwjgl3:1.12.1'
+    implementation 'com.badlogicgames.gdx:gdx-platform:1.12.1:natives-desktop'
+
+    testImplementation platform('org.junit:junit-bom:5.10.0')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+}
+
+test {
+    useJUnitPlatform()
+}

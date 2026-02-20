@@ -19,8 +19,6 @@ public class ThinkNode_EatFood extends ThinkNode {
     private static final float MOVE_SPEED = 2.2f;
     private static final float STUCK_TIMEOUT_SECONDS = 6f;
 
-    private float stuckTimer = 0f;
-
     @Override
     public float getPriority(Entity entity, ECSWorld ecsWorld, World world) {
         NeedsComponent needs = entity.get(NeedsComponent.class);
@@ -45,10 +43,10 @@ public class ThinkNode_EatFood extends ThinkNode {
 
         // Step 1: Timeout check for stuck navigation states
         if (ai.taskType == TaskType.MOVE_TO_FOOD || ai.taskType == TaskType.MOVE_TO_FOOD_GROWER) {
-            stuckTimer += delta;
-            if (stuckTimer > STUCK_TIMEOUT_SECONDS) {
+            ai.stuckTimer += delta;
+            if (ai.stuckTimer > STUCK_TIMEOUT_SECONDS) {
                 ai.clearTask();
-                stuckTimer = 0f;
+                ai.stuckTimer = 0f;
                 return false;
             }
         }
@@ -58,14 +56,14 @@ public class ThinkNode_EatFood extends ThinkNode {
             // Step 2: Walk to food tile and eat
             if (ai.taskType != TaskType.MOVE_TO_FOOD) {
                 ai.setTask(TaskType.MOVE_TO_FOOD, foodTile.getX(), foodTile.getY());
-                stuckTimer = 0f;
+                ai.stuckTimer = 0f;
             }
             ai.moveTowardTarget(pos, delta, MOVE_SPEED, world);
             if (ai.isAtTarget(pos.x, pos.y)) {
                 Item food = foodTile.takeFirstItem(ItemType.FOOD);
                 if (food != null) needs.eat();
                 ai.clearTask();
-                stuckTimer = 0f;
+                ai.stuckTimer = 0f;
             }
             return true;
         }
@@ -77,7 +75,7 @@ public class ThinkNode_EatFood extends ThinkNode {
             if (stockpile == null) {
                 inv.carriedItem = null;
                 ai.clearTask();
-                stuckTimer = 0f;
+                ai.stuckTimer = 0f;
                 return false;
             }
             ai.setTask(TaskType.HAULING, stockpile.getX(), stockpile.getY());
@@ -88,7 +86,7 @@ public class ThinkNode_EatFood extends ThinkNode {
                 Item food = stockpile.takeFirstItem(ItemType.FOOD);
                 if (food != null) needs.eat();
                 ai.clearTask();
-                stuckTimer = 0f;
+                ai.stuckTimer = 0f;
             }
             return true;
         }
@@ -114,7 +112,7 @@ public class ThinkNode_EatFood extends ThinkNode {
             PositionComponent bp = nearest.get(PositionComponent.class);
             if (ai.taskType != TaskType.MOVE_TO_FOOD_GROWER) {
                 ai.setTask(TaskType.MOVE_TO_FOOD_GROWER, (int) bp.x, (int) bp.y);
-                stuckTimer = 0f;
+                ai.stuckTimer = 0f;
             }
             ai.moveTowardTarget(pos, delta, MOVE_SPEED, world);
             if (ai.isAtTarget(pos.x, pos.y)) {
@@ -125,7 +123,7 @@ public class ThinkNode_EatFood extends ThinkNode {
                 } else {
                     ai.clearTask();
                 }
-                stuckTimer = 0f;
+                ai.stuckTimer = 0f;
             }
             return true;
         }

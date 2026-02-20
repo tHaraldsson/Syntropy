@@ -14,6 +14,7 @@ import com.haraldsson.syntropy.world.World;
  */
 public class ThinkNode_Haul extends ThinkNode {
     private static final float MOVE_SPEED = 2.2f;
+    private static final float STUCK_TIMEOUT = 5f;
 
     @Override
     public float getPriority(Entity entity, ECSWorld ecsWorld, World world) {
@@ -39,11 +40,14 @@ public class ThinkNode_Haul extends ThinkNode {
             Tile stockpile = world.getStockpileTile();
             if (stockpile == null) return false;
             ai.setTask(TaskType.MOVE_TO_STOCKPILE, stockpile.getX(), stockpile.getY());
+            ai.stuckTimer += delta;
+            if (ai.stuckTimer > STUCK_TIMEOUT) { ai.clearTask(); ai.stuckTimer = 0f; return false; }
             ai.moveTowardTarget(pos, delta, MOVE_SPEED, world);
             if (ai.isAtTarget(pos.x, pos.y)) {
                 stockpile.addItem(inv.carriedItem);
                 inv.carriedItem = null;
                 ai.clearTask();
+                ai.stuckTimer = 0f;
             }
             return true;
         }
@@ -69,11 +73,14 @@ public class ThinkNode_Haul extends ThinkNode {
         TaskType task = "MINER".equals(bc.buildingType)
                 ? TaskType.MOVE_TO_MINER : TaskType.MOVE_TO_FOOD_GROWER;
         ai.setTask(task, (int) bp.x, (int) bp.y);
+        ai.stuckTimer += delta;
+        if (ai.stuckTimer > STUCK_TIMEOUT) { ai.clearTask(); ai.stuckTimer = 0f; return false; }
         ai.moveTowardTarget(pos, delta, MOVE_SPEED, world);
         if (ai.isAtTarget(pos.x, pos.y)) {
             Item output = bc.takeOutput();
             if (output != null) inv.carriedItem = output;
             ai.clearTask();
+            ai.stuckTimer = 0f;
         }
         return true;
     }

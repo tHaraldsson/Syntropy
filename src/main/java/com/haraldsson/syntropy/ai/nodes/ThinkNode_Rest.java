@@ -58,12 +58,21 @@ public class ThinkNode_Rest extends ThinkNode {
                 }
 
                 if (!ai.isAtTarget(pos.x, pos.y)) {
-                    // Walk toward the bed
-                    ai.moveTowardTarget(pos, delta, MOVE_SPEED, world);
+                    // Walk toward the bed; give up if stuck too long
+                    ai.stuckTimer += delta;
+                    if (ai.stuckTimer > 10f) {
+                        // Fall through to ground sleep at current position
+                        ai.setTask(TaskType.RESTING, (int) pos.x, (int) pos.y);
+                        ai.resetWanderCooldown(REST_DURATION);
+                        ai.stuckTimer = 0f;
+                    } else {
+                        ai.moveTowardTarget(pos, delta, MOVE_SPEED, world);
+                    }
                     return true;
                 }
 
-                // At bed: start sleep timer on arrival
+                // At bed: reset stuck timer and start sleep timer on arrival
+                ai.stuckTimer = 0f;
                 if (ai.wanderCooldown <= 0f) {
                     ai.resetWanderCooldown(REST_DURATION);
                 }

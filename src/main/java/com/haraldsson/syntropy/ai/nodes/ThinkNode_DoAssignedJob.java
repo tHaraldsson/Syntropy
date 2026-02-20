@@ -100,8 +100,7 @@ public class ThinkNode_DoAssignedJob extends ThinkNode {
             ai.setTask(TaskType.MOVE_TO_STOCKPILE, stockpile.getX(), stockpile.getY());
             ai.stuckTimer += delta;
             if (ai.stuckTimer > STUCK_TIMEOUT_SECONDS) {
-                ai.clearTask();
-                ai.stuckTimer = 0f;
+                ai.recoverFromStuck(pos, world);
                 return false;
             }
             ai.moveTowardTarget(pos, delta, MOVE_SPEED, world);
@@ -131,11 +130,11 @@ public class ThinkNode_DoAssignedJob extends ThinkNode {
         if (nearest == null) return false;
         PositionComponent bp = nearest.get(PositionComponent.class);
         BuildingComponent bc = nearest.get(BuildingComponent.class);
-        ai.setTask(TaskType.MOVE_TO_MINER, (int) bp.x, (int) bp.y);
+        // FIX BUG1: haul logic now handles all item types including WOOD (2026-02-20)
+        ai.setTask(TaskType.HAULING, (int) Math.floor(bp.x), (int) Math.floor(bp.y));
         ai.stuckTimer += delta;
         if (ai.stuckTimer > STUCK_TIMEOUT_SECONDS) {
-            ai.clearTask();
-            ai.stuckTimer = 0f;
+            ai.recoverFromStuck(pos, world);
             return false;
         }
         ai.moveTowardTarget(pos, delta, MOVE_SPEED, world);
@@ -161,8 +160,7 @@ public class ThinkNode_DoAssignedJob extends ThinkNode {
             ai.setTask(TaskType.MOVE_TO_STOCKPILE, stockpile.getX(), stockpile.getY());
             ai.stuckTimer += delta;
             if (ai.stuckTimer > STUCK_TIMEOUT_SECONDS) {
-                ai.clearTask();
-                ai.stuckTimer = 0f;
+                ai.recoverFromStuck(pos, world);
                 return false;
             }
             ai.moveTowardTarget(pos, delta, MOVE_SPEED, world);
@@ -193,11 +191,10 @@ public class ThinkNode_DoAssignedJob extends ThinkNode {
         BuildingComponent bc = nearest.get(BuildingComponent.class);
         PositionComponent bp = nearest.get(PositionComponent.class);
         TaskType task = "MINER".equals(buildingType) ? TaskType.MOVE_TO_MINER : TaskType.MOVE_TO_FOOD_GROWER;
-        ai.setTask(task, (int) bp.x, (int) bp.y);
+        ai.setTask(task, (int) Math.floor(bp.x), (int) Math.floor(bp.y));
         ai.stuckTimer += delta;
         if (ai.stuckTimer > STUCK_TIMEOUT_SECONDS) {
-            ai.clearTask();
-            ai.stuckTimer = 0f;
+            ai.recoverFromStuck(pos, world);
             return false;
         }
         ai.moveTowardTarget(pos, delta, MOVE_SPEED, world);

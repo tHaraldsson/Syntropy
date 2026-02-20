@@ -56,8 +56,9 @@ public class AIComponent implements Component {
         float nx = pos.x + (dx / dist) * step;
         float ny = pos.y + (dy / dist) * step;
         if (world != null) {
-            boolean canX = world.isPassable((int) nx, (int) pos.y);
-            boolean canY = world.isPassable((int) pos.x, (int) ny);
+            // FIX BUG4b: corrected NPC collision to match player fix (2026-02-20)
+            boolean canX = world.isPassable((int) Math.floor(nx), (int) Math.floor(pos.y));
+            boolean canY = world.isPassable((int) Math.floor(pos.x), (int) Math.floor(ny));
             if (!canX && !canY) return;
             if (canX) pos.x = nx;
             if (canY) pos.y = ny;
@@ -65,6 +66,17 @@ public class AIComponent implements Component {
             pos.x = nx;
             pos.y = ny;
         }
+    }
+
+    public void recoverFromStuck(PositionComponent pos, World world) {
+        // FIX BUG4d: stuck NPC teleports to nearest passable tile before clearing task (2026-02-20)
+        int[] nearest = world.findNearestPassableTile(pos.x, pos.y);
+        if (nearest != null) {
+            pos.x = nearest[0] + 0.5f;
+            pos.y = nearest[1] + 0.5f;
+        }
+        clearTask();
+        stuckTimer = 0f;
     }
 
     public boolean shouldPickNewWanderTarget(float delta) {

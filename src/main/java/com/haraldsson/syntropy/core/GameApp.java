@@ -303,6 +303,16 @@ public class GameApp extends ApplicationAdapter {
                 }
             }
         }
+
+        // Render beds (separate component from BuildingComponent)
+        for (Entity e : gameState.ecsWorld.getEntitiesWith(BedComponent.class, PositionComponent.class)) {
+            PositionComponent pos = e.get(PositionComponent.class);
+            Texture tex = spriteManager.getBuildingTexture("BED");
+            if (tex != null) {
+                spriteBatch.draw(tex, pos.x * TILE_SIZE + 6, pos.y * TILE_SIZE + 6,
+                        TILE_SIZE - 12, TILE_SIZE - 12);
+            }
+        }
     }
 
     private void renderGroundItems() {

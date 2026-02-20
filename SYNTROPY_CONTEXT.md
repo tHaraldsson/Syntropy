@@ -26,7 +26,38 @@ The core narrative arc: **Survive → Automate → Expand → Cause Problems →
 
 ---
 
-> **Maintenance rule:** This context file must be updated whenever new fixes or systems are implemented. Always keep invariants, known bugs, and Category B/C issues current.
+## Issue Classification (as of 2026-02-20)
+
+### A — Logic Bugs (incorrect behavior violating stated invariants)
+1. ✅ **`BuildingProductionSystem` did not fire `RESOURCE_PRODUCED`** — violated the invariant that all inter-system communication goes through the event bus. Fixed: fires `RESOURCE_PRODUCED` via `gameState.events.fireAndLog()` after each production tick.
+2. ✅ **`ResearchSystem` did not fire `RESEARCH_COMPLETED`** — same invariant violation. Fixed: fires `RESEARCH_COMPLETED` via `events.fire()` when a tech's progress reaches its `researchTime`.
+3. ✅ **Research system was a flat 4-tech tree** — the architecture specifies 5 eras with prerequisites. Fixed: replaced with 22 techs across 5 eras, each with `id`, `displayName`, `era`, `prerequisites`, `researchCost`. `startResearch()` enforces prerequisites before beginning.
+4. ✅ **Colonist death did not drop carried items** — if a colonist died while carrying an item, the item was silently lost. Fixed: `NeedsSystem` now drops `inv.carriedItem` to the ground tile at the colonist's position on the first tick after death. `HealthComponent.deathItemsDropped` flag prevents duplicate drops.
+5. ✅ **`ThinkNode_Haul` fired for ALL colonists regardless of role** — `ThinkNode_Haul` at priority 50 activated for any colonist who saw building output, conflicting with `ThinkNode_DoAssignedJob` at the same priority. Fixed: `ThinkNode_Haul.getPriority()` now checks `WorkSettingsComponent` for `HAULER` role (priority > 0) and returns 0 if not a HAULER.
+6. ✅ **`successionCandidates` / `pendingSuccession` field name consistency** — verified in `GameApp`: `private boolean pendingSuccession` and `private List<Entity> successionCandidates` are used consistently throughout the file. No mismatch found.
+
+### B — State-Transition Ambiguities (undefined/contradictory behavior in edge cases)
+1. **HAULER carrying item on death** — if a HAULER dies mid-haul, the item is now dropped to their position tile. Whether hauling resumes for another colonist is undefined (no pending haul task system yet).
+2. **Multiple colonists targeting same building output** — two HAULER colonists can both pick from the same building in the same tick before outputs are decremented. Acceptable given current single-output-per-tick design, but could cause race conditions with multiple haulers.
+3. **Research interrupted by load** — if the game is saved mid-research and loaded, `currentResearch` resumes from `progress`. This is the intended behavior but is implicit.
+
+### C — Acceptable Design Failures (intentional limitations or known tradeoffs)
+1. **No `ThinkNode_ReactToEmergency`** — requires combat/threat system which is not yet implemented. Acceptable limitation.
+2. **Single stockpile tile** — `World.getStockpileTile()` returns one tile. Multiple stockpiles would require a list, but single-stockpile is acceptable for current scope.
+3. **Linear tech ordering in `startNextResearch()`** — picks first available tech in declaration order. Players may prefer to choose; this is deferred to a research UI screen.
+
+---
+
+## Design Decisions (as of 2026-02-20)
+
+1. **Leader death → Game Over?** — No. Player chooses a successor from existing colonists. Only a total colony wipe (zero surviving colonists) is game over.
+2. **`aiDisabled` flag** — Yes. The leader entity uses `AIComponent.aiDisabled = true` so `AITaskSystem` skips it. This is the canonical way to distinguish player-controlled entities from NPC entities.
+3. **Carried items on colonist death** — Items are dropped to the ground tile at the colonist's last position (`PositionComponent.x`, `PositionComponent.y`). Items are not destroyed, not eaten. `HealthComponent.deathItemsDropped` prevents duplicate drops across ticks.
+4. **Stuck colonists** — Any colonist stuck longer than their node's `STUCK_TIMEOUT_SECONDS` threshold clears their task and returns to the think tree. This is the canonical anti-freeze mechanism. All ThinkNodes implement this pattern.
+5. **Event bus** — Always instance-based via `gameState.events`. Never static. Enforced by architecture. `GameEvents.clearListeners()` is called on load to prevent double-wiring.
+
+---
+
 
 ---
 
@@ -517,6 +548,10 @@ public class ColonistBarEntry {
 - **Event bus wired into ResearchSystem** — `ResearchSystem` accepts `GameEvents` in its constructor (passed from `GameState`). Fires `RESEARCH_COMPLETED` (via `fire()`) when a tech finishes; the existing `wireEventBus()` listener logs the completion message.
 - **5-era research system** — `Technology` gains `era` (1–5) and `List<String> prerequisites` fields. `ResearchSystem` now contains 22 techs across 5 eras (Survival → Automation → Industrial → Space → Legacy) with prerequisite enforcement. `startResearch(String techId)`, `isCompleted(String techId)`, and `prerequisitesMet(Technology)` added. `startNextResearch()` respects prerequisites.
 
+- **ThinkNode_Haul restricted to HAULER-role colonists** — `ThinkNode_Haul.getPriority()` now returns 0 for any colonist whose `WorkSettingsComponent` has HAULER priority = 0. Only colonists with an active HAULER role (priority > 0) activate this node. ✅ (FIX: 2026-02-20)
+- **Colonist death drops carried items** — `NeedsSystem` drops `inv.carriedItem` to the ground tile at `(pos.x, pos.y)` on the first tick after death. `HealthComponent.deathItemsDropped` flag prevents duplicate drops. ✅ (FIX: 2026-02-20)
+- **Regression tests (13 headless JUnit 5 tests)** — `BuildingProductionSystemTest` (2), `ResearchSystemTest` (4), `ColonistDeathTest` (3), `ThinkNodeHaulTest` (4). All pass without LibGDX rendering. ✅ (2026-02-20)
+
 ### Current Focus 🔨
 - Add `ThinkNode_ReactToEmergency` (fire, attack, injury — priority 999). Needs combat/threat system first.
 - Basic faction system (at least one rival AI colony contributing to global pollution)
@@ -538,5 +573,5 @@ public class ColonistBarEntry {
 1. ~~**Successor selection UI:**~~ **RESOLVED** — pause overlay with up to 5 candidates + stats; player presses 1–5. Auto-picks if only one candidate.
 2. ~~**Event bus wiring:**~~ **RESOLVED** — `GameEvents` is instance-based, lives in `GameState`, passed implicitly through `gameState.events`. Systems access it through GameState.
 3. **Regional pollution granularity:** Per-tile or per-chunk (e.g., 5x5 tile regions)?
-4. **Research eras:** Should techs within an era be researchable in any order, or strictly linear?
+4. **Research eras:** Should techs within an era be researchable in any order, or strictly linear? **Current:** any order within an era as long as prerequisites are met.
 5. **Combat system:** What triggers `ThinkNode_ReactToEmergency`? Do we need hostile entities first, or can we start with natural disasters (fire)?

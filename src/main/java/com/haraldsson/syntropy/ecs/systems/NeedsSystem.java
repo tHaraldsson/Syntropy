@@ -4,9 +4,12 @@ import com.haraldsson.syntropy.ecs.ECSWorld;
 import com.haraldsson.syntropy.ecs.Entity;
 import com.haraldsson.syntropy.ecs.GameSystem;
 import com.haraldsson.syntropy.ecs.components.HealthComponent;
+import com.haraldsson.syntropy.ecs.components.InventoryComponent;
 import com.haraldsson.syntropy.ecs.components.NeedsComponent;
+import com.haraldsson.syntropy.ecs.components.PositionComponent;
 import com.haraldsson.syntropy.entities.EnergyCategory;
 import com.haraldsson.syntropy.entities.HungerCategory;
+import com.haraldsson.syntropy.world.Tile;
 import com.haraldsson.syntropy.world.World;
 
 import java.util.ArrayList;
@@ -25,6 +28,19 @@ public class NeedsSystem extends GameSystem {
         for (Entity e : ecsWorld.getEntitiesWith(NeedsComponent.class, HealthComponent.class)) {
             HealthComponent health = e.get(HealthComponent.class);
             if (health.dead) {
+                // FIX: Drop carried items to ground tile on colonist death — 2026-02-20
+                if (!health.deathItemsDropped) {
+                    health.deathItemsDropped = true;
+                    InventoryComponent inv = e.get(InventoryComponent.class);
+                    PositionComponent pos = e.get(PositionComponent.class);
+                    if (inv != null && inv.carriedItem != null && pos != null) {
+                        Tile tile = world.getTile((int) pos.x, (int) pos.y);
+                        if (tile != null) {
+                            tile.addItem(inv.carriedItem);
+                        }
+                        inv.carriedItem = null;
+                    }
+                }
                 health.deathTimer += delta;
                 if (health.deathTimer >= DEATH_DESPAWN_SECONDS) {
                     toRemove.add(e);

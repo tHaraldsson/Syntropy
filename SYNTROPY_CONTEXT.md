@@ -26,6 +26,10 @@ The core narrative arc: **Survive → Automate → Expand → Cause Problems →
 
 ---
 
+> **Maintenance rule:** This context file must be updated whenever new fixes or systems are implemented. Always keep invariants, known bugs, and Category B/C issues current.
+
+---
+
 ## The Player — The Leader
 
 The player controls **one single character**: the colony's leader. There is no possession-swapping. The leader IS the player.
@@ -490,7 +494,7 @@ public class ColonistBarEntry {
 - **ThinkNode_Socialize** — colonists seek out nearby colonists to socialize when needs are met (priority 10). Stays for 5s then clears (oscillation fix).
 - **Think Tree now has 6 nodes:** EatFood (100), Rest (80), DoAssignedJob (50), Haul (50), Socialize (10), Wander (1)
 - `HealthComponent.deathEventFired` flag — prevents duplicate death events
-- **Terrain collision for leader** — `PlayerController` checks X/Y independently so the leader slides along walls (BUG 1 fixed)
+- **Terrain collision for leader** — `PlayerController` checks X/Y independently so the leader slides along walls
 - **NPC terrain collision (axis-split sliding)** — `AIComponent.moveTowardTarget` slides along walls instead of freezing; colonists cannot walk through impassable tiles
 - **EatFood stuck timeout** — `ThinkNode_EatFood` uses `ai.stuckTimer` (6s) to clear stuck `MOVE_TO_FOOD`/`MOVE_TO_FOOD_GROWER` tasks
 - **Haul stuck timeout (5s)** — `ThinkNode_Haul` clears task if colonist cannot reach building or stockpile within 5s
@@ -531,7 +535,7 @@ public class ColonistBarEntry {
 - Multiplayer (KryoNet)
 
 ### Open Questions ❓
-1. **Successor selection UI:** Should this be a pause screen with a list of candidates + stats, or a simple popup? What info should be shown per candidate?
+1. ~~**Successor selection UI:**~~ **RESOLVED** — pause overlay with up to 5 candidates + stats; player presses 1–5. Auto-picks if only one candidate.
 2. ~~**Event bus wiring:**~~ **RESOLVED** — `GameEvents` is instance-based, lives in `GameState`, passed implicitly through `gameState.events`. Systems access it through GameState.
 3. **Regional pollution granularity:** Per-tile or per-chunk (e.g., 5x5 tile regions)?
 4. **Research eras:** Should techs within an era be researchable in any order, or strictly linear?

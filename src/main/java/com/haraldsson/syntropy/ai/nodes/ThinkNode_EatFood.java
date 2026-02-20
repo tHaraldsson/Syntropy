@@ -22,10 +22,10 @@ public class ThinkNode_EatFood extends ThinkNode {
         NeedsComponent needs = entity.get(NeedsComponent.class);
         if (needs == null) return 0f;
         return switch (needs.getHungerCategory()) {
-            case STARVING -> 100f;
-            case URGENTLY_HUNGRY -> 70f;
-            case HUNGRY -> 20f;
-            case FED -> 0f;
+            case STARVING        -> 100f;
+            case URGENTLY_HUNGRY ->  80f;
+            case HUNGRY          ->  50f;
+            case FED             ->   0f;
         };
     }
 

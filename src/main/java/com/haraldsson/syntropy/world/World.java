@@ -68,6 +68,13 @@ public class World {
         return best;
     }
 
+    public boolean isPassable(int tileX, int tileY) {
+        Tile t = getTile(tileX, tileY);
+        if (t == null) return false;
+        TerrainType type = t.getTerrainType();
+        return type != TerrainType.WATER && type != TerrainType.STONE;
+    }
+
     public void clampPosition(float[] xy) {
         xy[0] = Math.max(0.1f, Math.min(width - 0.1f, xy[0]));
         xy[1] = Math.max(0.1f, Math.min(height - 0.1f, xy[1]));

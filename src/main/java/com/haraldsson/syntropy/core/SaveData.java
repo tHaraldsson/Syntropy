@@ -2,6 +2,7 @@ package com.haraldsson.syntropy.core;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Flat serializable data structure for save/load.
@@ -37,16 +38,20 @@ public class SaveData {
         // Needs
         public boolean hasNeeds;
         public float hunger, energy, needsHealth;
+        public float mood;
 
         // Health
         public boolean hasHealth;
         public boolean dead;
+        public boolean deathEventFired;
 
         // AI
         public boolean hasAI;
         public String taskType;
         public int targetX, targetY;
         public boolean aiDisabled;
+        public float wanderTimer;
+        public float wanderCooldown;
 
         // Inventory
         public boolean hasInventory;
@@ -54,6 +59,7 @@ public class SaveData {
 
         // Skills
         public boolean hasSkills;
+        public Map<String, Integer> skillsMap;
 
         // Building
         public boolean hasBuilding;

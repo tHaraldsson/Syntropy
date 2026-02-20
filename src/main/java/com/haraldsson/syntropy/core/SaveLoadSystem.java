@@ -81,15 +81,23 @@ public final class SaveLoadSystem {
                     ed.needsHealth = n.health;
                     ed.hasNeeds = true;
                 }
+                if (comp instanceof MoodComponent) {
+                    MoodComponent mc = (MoodComponent) comp;
+                    ed.mood = mc.mood;
+                }
                 if (comp instanceof HealthComponent) {
                     HealthComponent h = (HealthComponent) comp;
-                    ed.dead = h.dead; ed.hasHealth = true;
+                    ed.dead = h.dead;
+                    ed.deathEventFired = h.deathEventFired;
+                    ed.hasHealth = true;
                 }
                 if (comp instanceof AIComponent) {
                     AIComponent ai = (AIComponent) comp;
                     ed.taskType = ai.taskType.name();
                     ed.targetX = ai.targetX; ed.targetY = ai.targetY;
                     ed.aiDisabled = ai.aiDisabled;
+                    ed.wanderTimer = ai.wanderTimer;
+                    ed.wanderCooldown = ai.wanderCooldown;
                     ed.hasAI = true;
                 }
                 if (comp instanceof InventoryComponent) {
@@ -98,6 +106,8 @@ public final class SaveLoadSystem {
                     ed.hasInventory = true;
                 }
                 if (comp instanceof SkillsComponent) {
+                    SkillsComponent sk = (SkillsComponent) comp;
+                    ed.skillsMap = new java.util.HashMap<>(sk.skills);
                     ed.hasSkills = true;
                 }
                 if (comp instanceof BuildingComponent) {
@@ -185,11 +195,14 @@ public final class SaveLoadSystem {
                 n.hunger = ed.hunger; n.energy = ed.energy;
                 n.health = ed.needsHealth;
                 entity.add(n);
-                entity.add(new MoodComponent()); // mood calculated by MoodSystem
+                MoodComponent mc = new MoodComponent();
+                mc.mood = ed.mood;
+                entity.add(mc);
             }
             if (ed.hasHealth) {
                 HealthComponent h = new HealthComponent();
                 h.dead = ed.dead;
+                h.deathEventFired = ed.deathEventFired;
                 entity.add(h);
             }
             if (ed.hasAI) {
@@ -197,6 +210,8 @@ public final class SaveLoadSystem {
                 ai.taskType = com.haraldsson.syntropy.entities.TaskType.valueOf(ed.taskType);
                 ai.targetX = ed.targetX; ai.targetY = ed.targetY;
                 ai.aiDisabled = ed.aiDisabled;
+                ai.wanderTimer = ed.wanderTimer;
+                ai.wanderCooldown = ed.wanderCooldown;
                 entity.add(ai);
             }
             if (ed.hasInventory) {
@@ -207,7 +222,11 @@ public final class SaveLoadSystem {
                 entity.add(inv);
             }
             if (ed.hasSkills) {
-                entity.add(new SkillsComponent());
+                SkillsComponent sk = new SkillsComponent();
+                if (ed.skillsMap != null) {
+                    sk.skills.putAll(ed.skillsMap);
+                }
+                entity.add(sk);
             }
             if (ed.hasBuilding) {
                 BuildingComponent bc = new BuildingComponent(

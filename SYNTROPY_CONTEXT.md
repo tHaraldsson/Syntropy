@@ -633,3 +633,22 @@ The following architecture invariants were checked against all source files afte
 | 8 | **Carried items on colonist death dropped to ground tile** | ✅ Verified | `NeedsSystem` drops `inv.carriedItem` to `world.getTile((int)pos.x, (int)pos.y)` on first dead-tick. `deathItemsDropped` flag prevents re-drop. |
 | 9 | **`ThinkNode_Haul` restricted to HAULER-role colonists** | ✅ Verified | `getPriority()` returns 0f if `WorkSettingsComponent` is null or `getPriority(HAULER) == 0`. |
 | 10 | **Research prerequisites enforced** — era-1 techs unlocked by default; others require prerequisites | ✅ Verified | `startResearch(String id)` calls `prerequisitesMet(tech)` before setting `currentResearch`. `startNextResearch()` does the same. |
+
+---
+
+## Bug Fixes (2026-02-20) — Collision + Pathfinding
+
+- ✅ BUG-COLLISION: All float→tile conversions now use Math.floor() — symmetric collision on all sides
+- ✅ BUG-COLLISION: 4-corner body collision check via `World.canMove(float, float)` — characters cannot clip sprite edges
+- ✅ BUG-COLLISION: Axis-split movement in player + NPC — sliding along walls instead of freezing
+- ✅ BUG-STUCK: RimWorld-style TryRecoverFromUnwalkablePosition — NPC teleports to nearest passable tile when stuck in terrain (`AITaskSystem.tryRecoverFromImpassable()`)
+- ✅ BUG-STUCK: Recovery check runs at the START of every NPC frame in `AITaskSystem.update()` before the think tree
+- ✅ BUG-STUCK: Passability pre-check before setting NPC targets — A* returns empty path for impassable goals, triggering stuck timer recovery
+- ✅ BUG-PATHFINDING: A* pathfinder (`Pathfinder.java`) with no-corner-cut diagonal constraint — NPCs navigate around obstacles
+
+## Invariants Added
+- All tile lookups from float positions must use `(int) Math.floor()`, never `(int)` cast
+- NPC targets must be passable before the task is accepted (enforced by A* returning empty path)
+- If NPC position is impassable, recovery runs before any think logic (`AITaskSystem.update()`)
+- `Pathfinder` is a stateless utility class — only static methods, no instance state
+- `currentPath` (`List<int[]>`) and `pathIndex` (`int`) in `AIComponent` are Gson-serializable

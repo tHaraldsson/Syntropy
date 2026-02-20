@@ -121,7 +121,7 @@ public class ThinkNode_EatFood extends ThinkNode {
             BuildingComponent bc = nearest.get(BuildingComponent.class);
             PositionComponent bp = nearest.get(PositionComponent.class);
             if (ai.taskType != TaskType.MOVE_TO_FOOD_GROWER) {
-                ai.setTask(TaskType.MOVE_TO_FOOD_GROWER, (int) bp.x, (int) bp.y);
+                ai.setTask(TaskType.MOVE_TO_FOOD_GROWER, (int) Math.floor(bp.x), (int) Math.floor(bp.y));
                 ai.stuckTimer = 0f;
             }
             ai.moveTowardTarget(pos, delta, MOVE_SPEED, world);

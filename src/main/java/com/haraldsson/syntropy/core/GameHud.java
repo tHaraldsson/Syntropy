@@ -13,6 +13,7 @@ import com.haraldsson.syntropy.ecs.ECSWorld;
 import com.haraldsson.syntropy.ecs.Entity;
 import com.haraldsson.syntropy.ecs.components.*;
 import com.haraldsson.syntropy.entities.ItemType;
+import com.haraldsson.syntropy.entities.TaskType;
 import com.haraldsson.syntropy.input.PlayerController;
 import com.haraldsson.syntropy.systems.EventSystem;
 import com.haraldsson.syntropy.world.Tile;
@@ -35,6 +36,11 @@ public class GameHud {
     private final Label pickupLabel;
     private final Label leaderInfoLabel;
     private final Label buildModeLabel;
+
+    // Colonist bar (Pattern 7)
+    private final Table colonistBarTable;
+    private final ScrollPane colonistBarScroll;
+    private static final float SOCIAL_DISPLAY_RANGE = 3f; // must match SocialThoughtWorker.SOCIAL_RANGE
 
     private Texture whitePixel;
 
@@ -85,6 +91,15 @@ public class GameHud {
 
         // Bottom section
         Table bottomRow = new Table();
+
+        // Colonist bar (Pattern 7) — horizontal scrollable row of colonist entries
+        colonistBarTable = new Table();
+        colonistBarTable.left();
+        ScrollPane.ScrollPaneStyle scrollStyle = new ScrollPane.ScrollPaneStyle();
+        colonistBarScroll = new ScrollPane(colonistBarTable, scrollStyle);
+        colonistBarScroll.setScrollingDisabled(false, true);
+        colonistBarScroll.setFadeScrollBars(true);
+        bottomRow.add(colonistBarScroll).left().expandX().fillX().row();
 
         // Event log
         eventLogLabel = new Label("", skin, "small");
@@ -231,7 +246,102 @@ public class GameHud {
             buildModeLabel.setText("");
         }
 
+        // Colonist bar (Pattern 7) — rebuild each frame
+        updateColonistBar(ecsWorld);
+
         stage.act(Gdx.graphics.getDeltaTime());
+    }
+
+    private void updateColonistBar(ECSWorld ecsWorld) {
+        colonistBarTable.clearChildren();
+        for (Entity e : ecsWorld.getEntitiesWith(IdentityComponent.class, HealthComponent.class)) {
+            if (e.has(LeaderComponent.class)) continue; // leader shown in top-left
+            IdentityComponent id = e.get(IdentityComponent.class);
+            HealthComponent health = e.get(HealthComponent.class);
+
+            Table entry = new Table();
+            entry.pad(4).padLeft(6).padRight(6);
+
+            if (health.dead) {
+                String name = truncateName(id.name, 8);
+                Label nameLabel = new Label(name, skin, "small");
+                nameLabel.setColor(Color.GRAY);
+                Label deadLabel = new Label("DEAD", skin, "small");
+                deadLabel.setColor(Color.GRAY);
+                entry.add(nameLabel).left().row();
+                entry.add(deadLabel).left();
+            } else {
+                NeedsComponent needs = e.get(NeedsComponent.class);
+                AIComponent ai = e.get(AIComponent.class);
+
+                String name = truncateName(id.name, 8);
+                String status = deriveStatus(ai, e, ecsWorld);
+
+                Label nameLabel = new Label(name, skin, "small");
+                nameLabel.setColor(Color.WHITE);
+                Label statusLabel = new Label(status, skin, "small");
+                statusLabel.setColor(Color.YELLOW);
+
+                entry.add(nameLabel).left().row();
+                entry.add(statusLabel).left().row();
+
+                if (needs != null) {
+                    Label hungerBarLabel = new Label("H:" + makeBar(needs.hunger, 5), skin, "small");
+                    hungerBarLabel.setColor(Color.ORANGE);
+                    Label energyBarLabel = new Label("E:" + makeBar(needs.energy, 5), skin, "small");
+                    energyBarLabel.setColor(Color.CYAN);
+                    entry.add(hungerBarLabel).left().row();
+                    entry.add(energyBarLabel).left();
+                }
+            }
+
+            colonistBarTable.add(entry).top().padRight(4);
+        }
+    }
+
+    private String deriveStatus(AIComponent ai, Entity entity, ECSWorld ecsWorld) {
+        if (ai == null) return "IDLE";
+        TaskType task = ai.taskType;
+        if (task == TaskType.RESTING) return "SLEEPING";
+        if (task == TaskType.MOVE_TO_FOOD || task == TaskType.HAULING) return "EATING";
+        if (task == TaskType.MOVE_TO_STOCKPILE || task == TaskType.MOVE_TO_MINER
+                || task == TaskType.MOVE_TO_FOOD_GROWER) return "WORKING";
+        if (task == TaskType.WANDER) {
+            if (isNearAnotherColonist(entity, ecsWorld)) return "SOCIALIZING";
+        }
+        if (task == TaskType.IDLE) return "IDLE";
+        return task.name();
+    }
+
+    private boolean isNearAnotherColonist(Entity entity, ECSWorld ecsWorld) {
+        PositionComponent pos = entity.get(PositionComponent.class);
+        if (pos == null) return false;
+        for (Entity other : ecsWorld.getEntitiesWith(PositionComponent.class, HealthComponent.class, IdentityComponent.class)) {
+            if (other == entity) continue;
+            if (other.has(LeaderComponent.class)) continue;
+            HealthComponent h = other.get(HealthComponent.class);
+            if (h.dead) continue;
+            PositionComponent op = other.get(PositionComponent.class);
+            float dx = pos.x - op.x;
+            float dy = pos.y - op.y;
+            if (dx * dx + dy * dy <= SOCIAL_DISPLAY_RANGE * SOCIAL_DISPLAY_RANGE) return true;
+        }
+        return false;
+    }
+
+    private String makeBar(float value, int width) {
+        int filled = Math.round(value * width);
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < width; i++) {
+            sb.append(i < filled ? '#' : '.');
+        }
+        sb.append(']');
+        return sb.toString();
+    }
+
+    private String truncateName(String name, int maxLen) {
+        if (name == null) return "?";
+        return name.length() <= maxLen ? name : name.substring(0, maxLen - 1) + ".";
     }
 
     public Stage getStage() {

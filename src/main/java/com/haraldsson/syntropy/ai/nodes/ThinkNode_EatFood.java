@@ -93,12 +93,25 @@ public class ThinkNode_EatFood extends ThinkNode {
             return true;
         }
 
-        // Step 3: Find a FOOD_GROWER building with output to pick up
+        // Step 3: Find the nearest FOOD_GROWER building with output to pick up
+        Entity nearest = null;
+        float nearestDist = Float.MAX_VALUE;
         for (Entity bldg : ecsWorld.getEntitiesWith(BuildingComponent.class, PositionComponent.class)) {
             BuildingComponent bc = bldg.get(BuildingComponent.class);
             if (!"FOOD_GROWER".equalsIgnoreCase(bc.buildingType) && !"FOODGROWER".equalsIgnoreCase(bc.buildingType)) continue;
             if (!bc.hasOutput()) continue;
             PositionComponent bp = bldg.get(PositionComponent.class);
+            float dx = pos.x - bp.x;
+            float dy = pos.y - bp.y;
+            float dist = dx * dx + dy * dy;
+            if (dist < nearestDist) {
+                nearestDist = dist;
+                nearest = bldg;
+            }
+        }
+        if (nearest != null) {
+            BuildingComponent bc = nearest.get(BuildingComponent.class);
+            PositionComponent bp = nearest.get(PositionComponent.class);
             if (ai.taskType != TaskType.MOVE_TO_FOOD_GROWER) {
                 ai.setTask(TaskType.MOVE_TO_FOOD_GROWER, (int) bp.x, (int) bp.y);
                 stuckTimer = 0f;

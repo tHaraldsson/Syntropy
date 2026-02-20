@@ -490,12 +490,16 @@ public class ColonistBarEntry {
 - **ThinkNode_Socialize** — colonists seek out nearby colonists to socialize when needs are met (priority 10). Foundation for SocialThoughtWorker mood boost.
 - **Think Tree now has 6 nodes:** EatFood (100), Rest (80), DoAssignedJob (50), Haul (50), Socialize (10), Wander (1)
 - `HealthComponent.deathEventFired` flag — prevents duplicate death events
+- **Terrain collision for leader** — `PlayerController` checks X/Y independently so the leader slides along walls (BUG 1 fixed)
+- **NPC terrain collision** — all ThinkNodes pass `world` to `ai.moveTowardTarget()` so colonists cannot walk through impassable tiles (BUG 3 fixed)
+- **EatFood stuck timeout** — `ThinkNode_EatFood` has a `stuckTimer` (6s) that clears the task if navigation is stuck at `MOVE_TO_FOOD` or `MOVE_TO_FOOD_GROWER` (BUG 4 fixed)
+- **Nearest-building hauling** — `ThinkNode_Haul`, `ThinkNode_DoAssignedJob`, and `ThinkNode_EatFood` all pick the **nearest** building with output (by distance via PositionComponent) instead of the first in iteration order (BUG 2 fixed)
+- **SocialThoughtWorker** — grants +8f mood boost when a colonist is on WANDER task and within range 3f of another colonist. Wired into `MoodSystem` (Pattern 2 / FEATURE 1)
+- **HUD colonist bar (Pattern 7)** — horizontal scrollable row at the bottom of the screen. Each non-leader colonist entry shows: name (truncated), status label (IDLE/EATING/SLEEPING/WORKING/HAULING/SOCIALIZING), hunger bar (orange, ASCII), energy bar (cyan, ASCII). Dead colonists shown in grey with "DEAD". Updated every frame in `GameHud.update()`. Text-only, no portraits.
 
 ### Current Focus 🔨
 - Add `ThinkNode_ReactToEmergency` (fire, attack, injury — priority 999). Needs combat/threat system first.
-- HUD: colonist bar with portraits + status icons (Pattern 7 — not yet implemented)
-- Successor selection UI (currently auto-picks — context says player should choose)
-- Add `SocialThoughtWorker` to MoodSystem (mood boost when socializing)
+- Successor selection UI (currently auto-picks — player should choose from candidate list with stats)
 - Wire event bus into BuildingProductionSystem (fire RESOURCE_PRODUCED)
 - Wire event bus into ResearchSystem (fire RESEARCH_COMPLETED)
 

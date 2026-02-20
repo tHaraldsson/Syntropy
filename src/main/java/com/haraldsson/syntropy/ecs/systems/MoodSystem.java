@@ -9,6 +9,7 @@ import com.haraldsson.syntropy.ecs.components.NeedsComponent;
 import com.haraldsson.syntropy.systems.mood.*;
 import com.haraldsson.syntropy.world.World;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -19,14 +20,17 @@ import java.util.List;
 public class MoodSystem extends GameSystem {
     private static final float BASE_MOOD = 50f;
 
-    private final List<ThoughtWorker> workers = List.of(
-            new HungerThoughtWorker(),
-            new SleepThoughtWorker(),
-            new HealthThoughtWorker()
-    );
+    private List<ThoughtWorker> workers;
 
     @Override
     public void update(ECSWorld ecsWorld, World world, float delta) {
+        if (workers == null) {
+            workers = new ArrayList<>();
+            workers.add(new HungerThoughtWorker());
+            workers.add(new SleepThoughtWorker());
+            workers.add(new HealthThoughtWorker());
+            workers.add(new SocialThoughtWorker(ecsWorld));
+        }
         for (Entity e : ecsWorld.getEntitiesWith(NeedsComponent.class, MoodComponent.class, HealthComponent.class)) {
             HealthComponent health = e.get(HealthComponent.class);
             if (health.dead) continue;

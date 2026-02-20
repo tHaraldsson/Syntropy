@@ -583,6 +583,14 @@ public class ColonistBarEntry {
 - **Colonist death drops carried items** — `NeedsSystem` drops `inv.carriedItem` to the ground tile at `(pos.x, pos.y)` on the first tick after death. `HealthComponent.deathItemsDropped` flag prevents duplicate drops. ✅ (FIX: 2026-02-20)
 - **Regression tests (13 headless JUnit 5 tests)** — `BuildingProductionSystemTest` (2), `ResearchSystemTest` (4), `ColonistDeathTest` (3), `ThinkNodeHaulTest` (4). All pass without LibGDX rendering. ✅ (2026-02-20)
 
+## Bug Fixes (2026-02-20)
+- ✅ BUG1: Haul logic now handles all item types (wood, food, ore) — not just specific building types. Uses `TaskType.HAULING` for any building output pickup.
+- ✅ BUG2: Buildings and colonists can no longer spawn on impassable terrain (STONE or WATER); `findValidTile` now uses `world.isPassable()`. Player cannot build on impassable tiles via `tryPlaceBed` check.
+- ✅ BUG3: Player pickup radius expanded to 2 tiles (5×5 area); picks closest item/building when multiple in range.
+- ✅ BUG4: Collision detection aligned with sprites using `Math.floor()` for tile lookup in both `PlayerController` and `AIComponent.moveTowardTarget()`; stuck NPCs now teleport to nearest passable tile via `ai.recoverFromStuck()`.
+
+---
+
 ### Current Focus 🔨
 - Add `ThinkNode_ReactToEmergency` (fire, attack, injury — priority 999). Needs combat/threat system first.
 - Basic faction system (at least one rival AI colony contributing to global pollution)

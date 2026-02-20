@@ -26,6 +26,7 @@ public class ThinkNode_Haul extends ThinkNode {
         InventoryComponent inv = entity.get(InventoryComponent.class);
         if (inv != null && inv.carriedItem != null) return 50f; // must deliver
 
+        // FIX BUG1: haul logic now handles all item types including WOOD (2026-02-20)
         for (Entity bldg : ecsWorld.getEntitiesWith(BuildingComponent.class)) {
             BuildingComponent bc = bldg.get(BuildingComponent.class);
             if (bc.hasOutput()) return 50f;
@@ -47,8 +48,7 @@ public class ThinkNode_Haul extends ThinkNode {
             ai.setTask(TaskType.MOVE_TO_STOCKPILE, stockpile.getX(), stockpile.getY());
             ai.stuckTimer += delta;
             if (ai.stuckTimer > STUCK_TIMEOUT_SECONDS) {
-                ai.clearTask();
-                ai.stuckTimer = 0f;
+                ai.recoverFromStuck(pos, world);
                 return false;
             }
             ai.moveTowardTarget(pos, delta, MOVE_SPEED, world);
@@ -61,7 +61,8 @@ public class ThinkNode_Haul extends ThinkNode {
             return true;
         }
 
-        // Find the nearest building with output to pick up
+        // FIX BUG1: haul logic now handles all item types including WOOD (2026-02-20)
+        // Find the nearest building with output to pick up (any building type)
         Entity nearest = null;
         float nearestDist = Float.MAX_VALUE;
         for (Entity bldg : ecsWorld.getEntitiesWith(BuildingComponent.class, PositionComponent.class)) {
@@ -79,13 +80,10 @@ public class ThinkNode_Haul extends ThinkNode {
         if (nearest == null) return false;
         BuildingComponent bc = nearest.get(BuildingComponent.class);
         PositionComponent bp = nearest.get(PositionComponent.class);
-        TaskType task = "MINER".equals(bc.buildingType)
-                ? TaskType.MOVE_TO_MINER : TaskType.MOVE_TO_FOOD_GROWER;
-        ai.setTask(task, (int) bp.x, (int) bp.y);
+        ai.setTask(TaskType.HAULING, (int) Math.floor(bp.x), (int) Math.floor(bp.y));
         ai.stuckTimer += delta;
         if (ai.stuckTimer > STUCK_TIMEOUT_SECONDS) {
-            ai.clearTask();
-            ai.stuckTimer = 0f;
+            ai.recoverFromStuck(pos, world);
             return false;
         }
         ai.moveTowardTarget(pos, delta, MOVE_SPEED, world);
@@ -98,4 +96,3 @@ public class ThinkNode_Haul extends ThinkNode {
         return true;
     }
 }
-

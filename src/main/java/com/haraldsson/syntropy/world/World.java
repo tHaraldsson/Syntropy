@@ -69,10 +69,34 @@ public class World {
     }
 
     public boolean isPassable(int tileX, int tileY) {
+        // FIX BUG2c: verified/corrected passable terrain types (2026-02-20)
+        // FIX BUG4c: Tile (x, y) occupies world-space from (x, y) to (x+1, y+1).
+        // A position (px, py) is in tile (floor(px), floor(py)).
+        // Use (int)Math.floor(px) — NOT (int)px — to avoid asymmetric collision at negative coords.
         Tile t = getTile(tileX, tileY);
         if (t == null) return false;
         TerrainType type = t.getTerrainType();
         return type != TerrainType.WATER && type != TerrainType.STONE;
+    }
+
+    public int[] findNearestPassableTile(float fromX, float fromY) {
+        // FIX BUG4d: stuck NPC teleports to nearest passable tile before clearing task (2026-02-20)
+        // Spiral outward from current position for efficient early termination
+        int cx = (int) Math.floor(fromX);
+        int cy = (int) Math.floor(fromY);
+        for (int r = 0; r < Math.max(width, height); r++) {
+            for (int dy = -r; dy <= r; dy++) {
+                for (int dx = -r; dx <= r; dx++) {
+                    if (Math.abs(dx) != r && Math.abs(dy) != r) continue; // only check ring edges
+                    int tx = cx + dx;
+                    int ty = cy + dy;
+                    if (tx >= 0 && ty >= 0 && tx < width && ty < height && isPassable(tx, ty)) {
+                        return new int[]{tx, ty};
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     public void clampPosition(float[] xy) {

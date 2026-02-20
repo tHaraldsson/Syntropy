@@ -47,23 +47,23 @@ public final class WorldGenerator {
         ECSWorld ecsWorld = new ECSWorld();
 
         // Miner 1
-        int[] m1 = findValidTile(tiles, width, height, 4, 4);
+        int[] m1 = findValidTile(tiles, width, height, 4, 4, world);
         createBuilding(ecsWorld, world, tiles, m1[0], m1[1], "MINER", 5f, 5, ItemType.STONE);
 
         // Miner 2
-        int[] m2 = findValidTile(tiles, width, height, width - 5, 5);
+        int[] m2 = findValidTile(tiles, width, height, width - 5, 5, world);
         createBuilding(ecsWorld, world, tiles, m2[0], m2[1], "MINER", 5f, 5, ItemType.STONE);
 
         // Food Grower
-        int[] fg = findValidTile(tiles, width, height, width / 2, height / 2);
+        int[] fg = findValidTile(tiles, width, height, width / 2, height / 2, world);
         createBuilding(ecsWorld, world, tiles, fg[0], fg[1], "FOOD_GROWER", 10f, 5, ItemType.FOOD);
 
         // Woodcutter
-        int[] wc = findValidTile(tiles, width, height, width / 2 - 4, height / 2);
+        int[] wc = findValidTile(tiles, width, height, width / 2 - 4, height / 2, world);
         createBuilding(ecsWorld, world, tiles, wc[0], wc[1], "WOODCUTTER", 8f, 5, ItemType.WOOD);
 
         // Stockpile
-        int[] sp = findValidTile(tiles, width, height, width - 4, height - 4);
+        int[] sp = findValidTile(tiles, width, height, width - 4, height - 4, world);
         Tile stockpileTile = tiles[sp[0]][sp[1]];
         stockpileTile.setStockpile(true);
         for (int i = 0; i < 5; i++) stockpileTile.addItem(new Item(ItemType.FOOD));
@@ -72,17 +72,17 @@ public final class WorldGenerator {
         world.setStockpileTile(stockpileTile);
 
         // Leader (player-controlled)
-        int[] c1 = findValidTile(tiles, width, height, width / 2, height / 2 + 2);
+        int[] c1 = findValidTile(tiles, width, height, width / 2, height / 2 + 2, world);
         createLeader(ecsWorld, "Commander Kael", 30, c1[0] + 0.5f, c1[1] + 0.5f);
 
         // NPC Colonists
-        int[] c2 = findValidTile(tiles, width, height, width / 2 - 1, height / 2 + 2);
+        int[] c2 = findValidTile(tiles, width, height, width / 2 - 1, height / 2 + 2, world);
         createColonist(ecsWorld, "Ari", 28, c2[0] + 0.5f, c2[1] + 0.5f, ColonistRole.HAULER);
 
-        int[] c3 = findValidTile(tiles, width, height, width / 2 + 1, height / 2 + 2);
+        int[] c3 = findValidTile(tiles, width, height, width / 2 + 1, height / 2 + 2, world);
         createColonist(ecsWorld, "Bela", 34, c3[0] + 0.5f, c3[1] + 0.5f, ColonistRole.FARMER);
 
-        int[] c4 = findValidTile(tiles, width, height, width / 2, height / 2 + 3);
+        int[] c4 = findValidTile(tiles, width, height, width / 2, height / 2 + 3, world);
         createColonist(ecsWorld, "Dax", 22, c4[0] + 0.5f, c4[1] + 0.5f, ColonistRole.MINER);
 
         assignBedsToColonists(ecsWorld);
@@ -164,10 +164,11 @@ public final class WorldGenerator {
         return entity;
     }
 
-    private static int[] findValidTile(Tile[][] tiles, int w, int h, int hintX, int hintY) {
+    private static int[] findValidTile(Tile[][] tiles, int w, int h, int hintX, int hintY, World world) {
+        // FIX BUG2a: only spawn buildings/colonists on passable tiles (2026-02-20)
         hintX = Math.max(0, Math.min(w - 1, hintX));
         hintY = Math.max(0, Math.min(h - 1, hintY));
-        if (tiles[hintX][hintY].getTerrainType() != TerrainType.WATER
+        if (world.isPassable(hintX, hintY)
                 && tiles[hintX][hintY].getBuildingEntity() == null) {
             return new int[]{hintX, hintY};
         }
@@ -177,7 +178,7 @@ public final class WorldGenerator {
                     int nx = hintX + dx;
                     int ny = hintY + dy;
                     if (nx >= 0 && ny >= 0 && nx < w && ny < h
-                            && tiles[nx][ny].getTerrainType() != TerrainType.WATER
+                            && world.isPassable(nx, ny)
                             && tiles[nx][ny].getBuildingEntity() == null) {
                         return new int[]{nx, ny};
                     }

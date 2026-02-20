@@ -107,10 +107,11 @@ public class PlayerController {
         float newX = pos.x + moveX * MOVE_SPEED * delta;
         float newY = pos.y + moveY * MOVE_SPEED * delta;
 
-        if (world.isPassable((int) newX, (int) pos.y)) {
+        // FIX BUG4a: corrected player collision to use center-point tile check (2026-02-20)
+        if (world.isPassable((int) Math.floor(newX), (int) Math.floor(pos.y))) {
             pos.x = newX;
         }
-        if (world.isPassable((int) pos.x, (int) newY)) {
+        if (world.isPassable((int) Math.floor(pos.x), (int) Math.floor(newY))) {
             pos.y = newY;
         }
     }
@@ -147,6 +148,8 @@ public class PlayerController {
         }
     }
 
+    private static final int PICKUP_RADIUS = 2; // FIX BUG3: expanded pickup radius from 1 to 2 tiles for better player feel (2026-02-20)
+
     private void handlePickup() {
         if (!Gdx.input.isKeyJustPressed(Input.Keys.E)) return;
 
@@ -167,30 +170,52 @@ public class PlayerController {
             return;
         }
 
-        int[][] offsets = {{0,0}, {-1,0}, {1,0}, {0,-1}, {0,1}};
-        for (int[] off : offsets) {
-            int cx = tileX + off[0];
-            int cy = tileY + off[1];
-            Tile tile = world.getTile(cx, cy);
-            if (tile == null) continue;
+        // Search PICKUP_RADIUS tiles in each direction, pick the closest candidate
+        Tile bestTile = null;
+        Entity bestBuilding = null;
+        boolean bestIsBuilding = false;
+        float bestDist = Float.MAX_VALUE;
 
-            Entity buildingEntity = tile.getBuildingEntity();
-            if (buildingEntity != null) {
-                BuildingComponent bc = buildingEntity.get(BuildingComponent.class);
-                if (bc != null && bc.hasOutput()) {
-                    Item item = bc.takeOutput();
-                    inv.carriedItem = item;
-                    showPickupMessage("Picked up " + item.getType().name() + " from " + bc.buildingType);
-                    return;
+        for (int dy = -PICKUP_RADIUS; dy <= PICKUP_RADIUS; dy++) {
+            for (int dx = -PICKUP_RADIUS; dx <= PICKUP_RADIUS; dx++) {
+                int cx = tileX + dx;
+                int cy = tileY + dy;
+                Tile tile = world.getTile(cx, cy);
+                if (tile == null) continue;
+                float tileDist = dx * dx + dy * dy;
+
+                Entity buildingEntity = tile.getBuildingEntity();
+                if (buildingEntity != null) {
+                    BuildingComponent bc = buildingEntity.get(BuildingComponent.class);
+                    if (bc != null && bc.hasOutput() && tileDist < bestDist) {
+                        bestDist = tileDist;
+                        bestTile = tile;
+                        bestBuilding = buildingEntity;
+                        bestIsBuilding = true;
+                    }
+                }
+
+                if (!tile.getGroundItems().isEmpty() && tileDist < bestDist) {
+                    bestDist = tileDist;
+                    bestTile = tile;
+                    bestBuilding = null;
+                    bestIsBuilding = false;
                 }
             }
+        }
 
-            if (!tile.getGroundItems().isEmpty()) {
-                Item picked = tile.getGroundItems().remove(0);
-                inv.carriedItem = picked;
-                showPickupMessage("Picked up " + picked.getType().name());
-                return;
-            }
+        if (bestTile != null && bestIsBuilding && bestBuilding != null) {
+            BuildingComponent bc = bestBuilding.get(BuildingComponent.class);
+            Item item = bc.takeOutput();
+            inv.carriedItem = item;
+            showPickupMessage("Picked up " + item.getType().name() + " from " + bc.buildingType);
+            return;
+        }
+        if (bestTile != null && !bestIsBuilding && !bestTile.getGroundItems().isEmpty()) {
+            Item picked = bestTile.getGroundItems().remove(0);
+            inv.carriedItem = picked;
+            showPickupMessage("Picked up " + picked.getType().name());
+            return;
         }
 
         showPickupMessage("Nothing nearby");
@@ -212,6 +237,12 @@ public class PlayerController {
     private void tryPlaceBed(int tileX, int tileY) {
         Tile tile = world.getTile(tileX, tileY);
         if (tile == null) return;
+
+        // FIX BUG2b: block building placement on impassable tiles (2026-02-20)
+        if (!world.isPassable(tileX, tileY)) {
+            showPickupMessage("Cannot build on impassable terrain");
+            return;
+        }
 
         TerrainType t = tile.getTerrainType();
         if (t != TerrainType.GRASS && t != TerrainType.DIRT) return;

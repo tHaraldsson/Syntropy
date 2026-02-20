@@ -67,10 +67,15 @@ public class ThinkNode_Socialize extends ThinkNode {
         float dist = (float) Math.sqrt(dx * dx + dy * dy);
 
         if (dist < SOCIAL_RANGE) {
-            // We're close enough — "socializing" (standing near them)
-            // Mood boost comes from SocialThoughtWorker (to be added)
-            ai.clearTask();
-            return true;
+            // Within social range — use wander cooldown as social timer (5s)
+            if (ai.wanderCooldown <= 0f) {
+                ai.resetWanderCooldown(5f);
+            }
+            if (ai.shouldPickNewWanderTarget(delta)) {
+                ai.clearTask();
+                return false;
+            }
+            return true; // still socializing
         }
 
         // Move toward the other colonist

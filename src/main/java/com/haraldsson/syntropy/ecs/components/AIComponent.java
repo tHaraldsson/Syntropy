@@ -11,6 +11,7 @@ public class AIComponent implements Component {
     public float wanderTimer;
     public float wanderCooldown;
     public boolean aiDisabled;
+    public float stuckTimer = 0f; // used by ThinkNodes to detect navigation deadlock
 
     public void setTask(TaskType type, int tx, int ty) {
         this.taskType = type;

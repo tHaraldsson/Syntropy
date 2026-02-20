@@ -473,12 +473,13 @@ public class ColonistBarEntry {
 - Leader stats: charisma, engineering, science, combat (affects colony efficiency, research, diplomacy)
 - **Pattern 1 — Tiered Needs:** `HungerCategory` (FED/HUNGRY/URGENTLY_HUNGRY/STARVING), `EnergyCategory` (RESTED/TIRED/EXHAUSTED/COLLAPSED). Needs on 0.0–1.0 scale.
 - **Pattern 2 — Decoupled Mood System:** `MoodComponent` separate from needs. `ThoughtWorker` interface + `HungerThoughtWorker`, `SleepThoughtWorker`, `HealthThoughtWorker`, `SocialThoughtWorker`. `MoodSystem` calculates mood as sum of all ThoughtWorker offsets.
-- **Pattern 3 — Think Tree AI:** `ThinkNode` base class with `getPriority()` + `execute()`. `ThinkTreeRoot` picks highest-priority node. Implemented nodes: `ThinkNode_EatFood` (priority 100), `ThinkNode_Rest` (priority 80), `ThinkNode_Haul` (priority 50), `ThinkNode_DoAssignedJob` (priority 50), `ThinkNode_Socialize` (priority 10), `ThinkNode_Wander` (priority 1). `AITaskSystem` skips leader entity.
+- **Pattern 3 — Think Tree AI:** `ThinkNode` base class with `getPriority()` + `execute()`. `ThinkTreeRoot` picks highest-priority node. Implemented nodes: `ThinkNode_EatFood` (priority 100), `ThinkNode_Rest` (priority 80), `ThinkNode_Haul` (priority 50), `ThinkNode_Wander` (priority 1). `AITaskSystem` skips leader entity.
 - **Pattern 4 — Event Bus:** `GameEvents` class with `EventType` enum, `on()`/`fire()`/`fireAndLog()`. Instance-based (not static). Lives in `GameState`.
 - **Pattern 5 — GameState Root Object:** `GameState` class holding `World`, `ECSWorld`, `GameEvents`, `ResearchSystem`, `PollutionSystem`, dynasty tracking. No statics for game data.
 - **Pattern 6 — Per-Colonist Work Priorities:** `WorkSettingsComponent` with `Map<ColonistRole, Integer>` priorities (0–4 scale). `getActiveJobsSorted()` for Think Tree.
 - Global pollution system (`PollutionSystem` — building pollution rates, natural decay, colonist health debuffs, severity labels)
 - Aging system (`AgingComponent` + `AgingSystem` — real-time aging, natural death, leader succession with stat inheritance)
+- Dynasty/succession — player chooses successor via pause UI (keys 1–5); auto-picks if only one candidate
 - Colonist roles (`ColonistRole` enum + `RoleComponent`)
 - Random event system (heat waves, food blessings, exhaustion events)
 - Basic research system (4 techs — needs expansion to 5 eras)
@@ -486,27 +487,28 @@ public class ColonistBarEntry {
 - **GameState root wired into GameApp** — all systems reference `gameState.world`, `gameState.ecsWorld`, `gameState.pollution`, `gameState.research`
 - **Event bus wired** — `GameEvents` fires `COLONIST_DIED`, `LEADER_DIED`, `LEADER_SUCCEEDED`, `RESEARCH_COMPLETED`, `BUILDING_COMPLETED` events. Listeners log to event bus.
 - **ThinkNode_DoAssignedJob** — uses `WorkSettingsComponent` priorities (Pattern 6). Colonists perform their assigned role (HAULER, MINER, FARMER) based on priority settings.
-- **ThinkNode_Socialize** — colonists seek out nearby colonists to socialize when needs are met (priority 10). Uses `resetWanderCooldown(5f)` to linger 5s before clearing task (no oscillation).
-- **Think Tree has 6 nodes:** EatFood (100), Rest (80), DoAssignedJob (50), Haul (50), Socialize (10), Wander (1)
+- **ThinkNode_Socialize** — colonists seek out nearby colonists to socialize when needs are met (priority 10). Stays for 5s then clears (oscillation fix).
+- **Think Tree now has 6 nodes:** EatFood (100), Rest (80), DoAssignedJob (50), Haul (50), Socialize (10), Wander (1)
 - `HealthComponent.deathEventFired` flag — prevents duplicate death events
-- **Terrain collision for leader** — `PlayerController` checks X/Y independently so the leader slides along walls
-- **NPC terrain collision** — all ThinkNodes pass `world` to `ai.moveTowardTarget()` so colonists cannot walk through impassable tiles
-- **Shared stuck timer fix** — `ai.stuckTimer` lives in `AIComponent` (not as ThinkNode instance field). All ThinkNodes use `ai.stuckTimer` — fixes shared-state bug across colonists.
-- **EatFood stuck timeout** — 6s timeout at `MOVE_TO_FOOD` / `MOVE_TO_FOOD_GROWER` clears task if navigation is stuck.
-- **Haul stuck timeout** — 5s timeout in `ThinkNode_Haul` for `MOVE_TO_MINER`, `MOVE_TO_FOOD_GROWER`, `MOVE_TO_STOCKPILE`.
-- **Rest bed-stuck timeout** — 10s timeout in `ThinkNode_Rest` while walking to bed; falls back to ground sleep at current position.
-- **Wander/Rest timer guard** — `ThinkNode_Wander` returns `false` immediately if `ai.taskType == RESTING`, preventing wander timer from stomping the sleep cooldown.
-- **DoAssignedJob stuck timeout** — 5s timeout on all navigation states.
-- **Nearest-building hauling** — `ThinkNode_Haul`, `ThinkNode_DoAssignedJob`, and `ThinkNode_EatFood` all pick the **nearest** building with output (by distance via PositionComponent).
-- **SocialThoughtWorker** — grants +8f mood boost when colonist is on WANDER task and within 3f tiles of another colonist. Wired into `MoodSystem`.
-- **HUD colonist bar (Pattern 7)** — horizontal scrollable row at the bottom. Each colonist: name, status label, hunger bar (orange), energy bar (cyan). Dead colonists shown in grey with "DEAD".
-- **Energy bar in world rendering** — cyan energy bar at `barY - 15` added to colonist bars in `renderColonists()`.
-- **statusMessage rendering** — status messages now drawn at top of screen (world-space) in yellow using `smallFont` when `statusTimer > 0`.
-- **Dead entity removal** — `HealthComponent.deadTimer` accumulates after death; entity removed from `ecsWorld` after 30 seconds.
-- **Passive health regen** — `NeedsSystem` calls `needs.heal(HEALTH_REGEN * delta)` for well-fed + rested colonists.
-- **Successor selection UI** — on leader death, game pauses systems and shows overlay listing candidates with name/age/stats. Press 1–9 to choose. Single candidate auto-picks after 2s. Zero candidates shows restart prompt.
-- **Ctrl+R full game reset** — `resetGame()` re-generates world, re-creates all systems and state. Works at any time.
-- **World size 50×50** — `WORLD_WIDTH` / `WORLD_HEIGHT` constants updated from 30 to 50.
+- **Terrain collision for leader** — `PlayerController` checks X/Y independently so the leader slides along walls (BUG 1 fixed)
+- **NPC terrain collision (axis-split sliding)** — `AIComponent.moveTowardTarget` slides along walls instead of freezing; colonists cannot walk through impassable tiles
+- **EatFood stuck timeout** — `ThinkNode_EatFood` uses `ai.stuckTimer` (6s) to clear stuck `MOVE_TO_FOOD`/`MOVE_TO_FOOD_GROWER` tasks
+- **Haul stuck timeout (5s)** — `ThinkNode_Haul` clears task if colonist cannot reach building or stockpile within 5s
+- **DoAssignedJob stuck timeout (5s)** — `ThinkNode_DoAssignedJob` clears task if colonist cannot reach target within 5s
+- **Rest bed-stuck timeout (10s)** — `ThinkNode_Rest` falls back to sleeping on ground if colonist can't reach owned bed within 10s
+- **Wander timer guard** — `ThinkNode_Wander` no longer stomps `wanderTimer` while a colonist is `RESTING`
+- **Shared stuckTimer moved to `AIComponent`** — `ai.stuckTimer`, `ai.stuckTargetX`, `ai.stuckTargetY` are per-colonist fields; no more shared state across ThinkNode instances
+- **Nearest-building hauling** — `ThinkNode_Haul`, `ThinkNode_DoAssignedJob`, and `ThinkNode_EatFood` all pick the **nearest** building with output (by distance via PositionComponent) instead of the first in iteration order
+- **SocialThoughtWorker** — grants +15f mood boost when a colonist has `SOCIALIZING` task; grants +8f when `WANDER` task and within range 3f of another colonist. Wired into `MoodSystem` (Pattern 2)
+- **`SOCIALIZING` task type** — distinct from `WANDER`; used by `ThinkNode_Socialize` when colonist is in social range; colonist stays for 5s then clears
+- **HUD colonist bar (Pattern 7)** — horizontal scrollable row at the bottom of the screen. Each non-leader colonist entry shows: name (truncated), status label (IDLE/EATING/SLEEPING/WORKING/HAULING/SOCIALIZING), hunger bar (orange, ASCII), energy bar (cyan, ASCII). Dead colonists shown in grey with "DEAD". Updated every frame in `GameHud.update()`. Text-only, no portraits.
+- **Energy bar** — fourth bar (blue/cyan) added to world-space colonist need bars in `GameApp.renderColonists()`. Y offsets adjusted so all 4 bars (hunger/health/energy/mood) fit.
+- **Status message rendering** — `statusMessage` now drawn centered at top of viewport using `smallFont` (screen-space projection); shown when `statusTimer > 0`.
+- **Dead colonist despawn** — `HealthComponent.deathTimer` increments after death; entity removed from `ECSWorld` after 30 seconds via `NeedsSystem`.
+- **Passive health regen** — `NeedsSystem` heals at `HEALTH_REGEN` rate when colonist is `FED` and `RESTED`.
+- **Succession selection UI** — when succession is needed and multiple candidates exist, game pauses and shows overlay with up to 5 candidates + stats; player presses 1–5 to choose. Single candidate auto-selected with message.
+- **World reset (Ctrl+R)** — regenerates a fresh 50×50 world without restarting the application. Shown in HUD controls hint.
+- **World size 50×50** — `WORLD_WIDTH` and `WORLD_HEIGHT` constants updated from 30 to 50.
 
 ### Current Focus 🔨
 - Add `ThinkNode_ReactToEmergency` (fire, attack, injury — priority 999). Needs combat/threat system first.
@@ -529,6 +531,8 @@ public class ColonistBarEntry {
 - Multiplayer (KryoNet)
 
 ### Open Questions ❓
-1. **Regional pollution granularity:** Per-tile or per-chunk (e.g., 5x5 tile regions)?
-2. **Research eras:** Should techs within an era be researchable in any order, or strictly linear?
-3. **Combat system:** What triggers `ThinkNode_ReactToEmergency`? Do we need hostile entities first, or can we start with natural disasters (fire)?
+1. **Successor selection UI:** Should this be a pause screen with a list of candidates + stats, or a simple popup? What info should be shown per candidate?
+2. ~~**Event bus wiring:**~~ **RESOLVED** — `GameEvents` is instance-based, lives in `GameState`, passed implicitly through `gameState.events`. Systems access it through GameState.
+3. **Regional pollution granularity:** Per-tile or per-chunk (e.g., 5x5 tile regions)?
+4. **Research eras:** Should techs within an era be researchable in any order, or strictly linear?
+5. **Combat system:** What triggers `ThinkNode_ReactToEmergency`? Do we need hostile entities first, or can we start with natural disasters (fire)?

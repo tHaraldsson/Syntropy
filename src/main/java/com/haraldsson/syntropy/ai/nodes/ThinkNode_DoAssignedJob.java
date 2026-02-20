@@ -19,7 +19,7 @@ import java.util.List;
  */
 public class ThinkNode_DoAssignedJob extends ThinkNode {
     private static final float MOVE_SPEED = 2.0f;
-    private static final float STUCK_TIMEOUT = 5f;
+    private static final float STUCK_TIMEOUT_SECONDS = 5f;
 
     @Override
     public float getPriority(Entity entity, ECSWorld ecsWorld, World world) {
@@ -99,7 +99,11 @@ public class ThinkNode_DoAssignedJob extends ThinkNode {
             if (stockpile == null) return false;
             ai.setTask(TaskType.MOVE_TO_STOCKPILE, stockpile.getX(), stockpile.getY());
             ai.stuckTimer += delta;
-            if (ai.stuckTimer > STUCK_TIMEOUT) { ai.clearTask(); ai.stuckTimer = 0f; return false; }
+            if (ai.stuckTimer > STUCK_TIMEOUT_SECONDS) {
+                ai.clearTask();
+                ai.stuckTimer = 0f;
+                return false;
+            }
             ai.moveTowardTarget(pos, delta, MOVE_SPEED, world);
             if (ai.isAtTarget(pos.x, pos.y)) {
                 stockpile.addItem(inv.carriedItem);
@@ -129,7 +133,11 @@ public class ThinkNode_DoAssignedJob extends ThinkNode {
         BuildingComponent bc = nearest.get(BuildingComponent.class);
         ai.setTask(TaskType.MOVE_TO_MINER, (int) bp.x, (int) bp.y);
         ai.stuckTimer += delta;
-        if (ai.stuckTimer > STUCK_TIMEOUT) { ai.clearTask(); ai.stuckTimer = 0f; return false; }
+        if (ai.stuckTimer > STUCK_TIMEOUT_SECONDS) {
+            ai.clearTask();
+            ai.stuckTimer = 0f;
+            return false;
+        }
         ai.moveTowardTarget(pos, delta, MOVE_SPEED, world);
         if (ai.isAtTarget(pos.x, pos.y)) {
             Item output = bc.takeOutput();
@@ -152,7 +160,11 @@ public class ThinkNode_DoAssignedJob extends ThinkNode {
             if (stockpile == null) return false;
             ai.setTask(TaskType.MOVE_TO_STOCKPILE, stockpile.getX(), stockpile.getY());
             ai.stuckTimer += delta;
-            if (ai.stuckTimer > STUCK_TIMEOUT) { ai.clearTask(); ai.stuckTimer = 0f; return false; }
+            if (ai.stuckTimer > STUCK_TIMEOUT_SECONDS) {
+                ai.clearTask();
+                ai.stuckTimer = 0f;
+                return false;
+            }
             ai.moveTowardTarget(pos, delta, MOVE_SPEED, world);
             if (ai.isAtTarget(pos.x, pos.y)) {
                 stockpile.addItem(inv.carriedItem);
@@ -183,7 +195,11 @@ public class ThinkNode_DoAssignedJob extends ThinkNode {
         TaskType task = "MINER".equals(buildingType) ? TaskType.MOVE_TO_MINER : TaskType.MOVE_TO_FOOD_GROWER;
         ai.setTask(task, (int) bp.x, (int) bp.y);
         ai.stuckTimer += delta;
-        if (ai.stuckTimer > STUCK_TIMEOUT) { ai.clearTask(); ai.stuckTimer = 0f; return false; }
+        if (ai.stuckTimer > STUCK_TIMEOUT_SECONDS) {
+            ai.clearTask();
+            ai.stuckTimer = 0f;
+            return false;
+        }
         ai.moveTowardTarget(pos, delta, MOVE_SPEED, world);
         if (ai.isAtTarget(pos.x, pos.y)) {
             Item output = bc.takeOutput();

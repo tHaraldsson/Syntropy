@@ -306,6 +306,7 @@ public class GameHud {
         if (task == TaskType.MOVE_TO_FOOD || task == TaskType.HAULING) return "EATING";
         if (task == TaskType.MOVE_TO_STOCKPILE || task == TaskType.MOVE_TO_MINER
                 || task == TaskType.MOVE_TO_FOOD_GROWER) return "WORKING";
+        if (task == TaskType.SOCIALIZING) return "SOCIALIZING";
         if (task == TaskType.WANDER) {
             if (isNearAnotherColonist(entity, ecsWorld)) return "SOCIALIZING";
         }

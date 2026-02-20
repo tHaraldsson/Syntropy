@@ -8,6 +8,7 @@ public enum TaskType {
     MOVE_TO_FOOD_GROWER,
     HAULING,
     RESTING,
-    WANDER
+    WANDER,
+    SOCIALIZING
 }
 

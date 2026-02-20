@@ -41,6 +41,15 @@ public class ThinkNode_Socialize extends ThinkNode {
         PositionComponent pos = entity.get(PositionComponent.class);
         if (ai == null || pos == null) return false;
 
+        // If already socializing, wait for the cooldown to expire then clear (FIX 3)
+        if (ai.taskType == TaskType.SOCIALIZING) {
+            if (ai.shouldPickNewWanderTarget(delta)) {
+                ai.clearTask();
+                return false;
+            }
+            return true;
+        }
+
         // Find nearest living non-leader colonist
         Entity nearest = null;
         float nearestDist = Float.MAX_VALUE;
@@ -67,15 +76,10 @@ public class ThinkNode_Socialize extends ThinkNode {
         float dist = (float) Math.sqrt(dx * dx + dy * dy);
 
         if (dist < SOCIAL_RANGE) {
-            // Within social range — use wander cooldown as social timer (5s)
-            if (ai.wanderCooldown <= 0f) {
-                ai.resetWanderCooldown(5f);
-            }
-            if (ai.shouldPickNewWanderTarget(delta)) {
-                ai.clearTask();
-                return false;
-            }
-            return true; // still socializing
+            // We're close enough — start socializing for 5 seconds (FIX 3)
+            ai.setTask(TaskType.SOCIALIZING, (int) targetPos.x, (int) targetPos.y);
+            ai.resetWanderCooldown(5f);
+            return true;
         }
 
         // Move toward the other colonist

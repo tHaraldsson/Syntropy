@@ -11,7 +11,11 @@ public class AIComponent implements Component {
     public float wanderTimer;
     public float wanderCooldown;
     public boolean aiDisabled;
-    public float stuckTimer = 0f; // used by ThinkNodes to detect navigation deadlock
+
+    // Per-colonist stuck detection (FIX 1)
+    public float stuckTimer = 0f;
+    public int stuckTargetX = -1;
+    public int stuckTargetY = -1;
 
     public void setTask(TaskType type, int tx, int ty) {
         this.taskType = type;
@@ -51,11 +55,16 @@ public class AIComponent implements Component {
         float step = speed * delta;
         float nx = pos.x + (dx / dist) * step;
         float ny = pos.y + (dy / dist) * step;
-        if (world != null && !world.isPassable((int) nx, (int) ny)) {
-            return; // blocked by impassable terrain
+        if (world != null) {
+            boolean canX = world.isPassable((int) nx, (int) pos.y);
+            boolean canY = world.isPassable((int) pos.x, (int) ny);
+            if (!canX && !canY) return;
+            if (canX) pos.x = nx;
+            if (canY) pos.y = ny;
+        } else {
+            pos.x = nx;
+            pos.y = ny;
         }
-        pos.x = nx;
-        pos.y = ny;
     }
 
     public boolean shouldPickNewWanderTarget(float delta) {

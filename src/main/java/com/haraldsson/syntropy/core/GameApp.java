@@ -10,6 +10,7 @@ import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
+import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.MathUtils;
@@ -24,8 +25,6 @@ import com.haraldsson.syntropy.systems.EventSystem;
 import com.haraldsson.syntropy.systems.Technology;
 import com.haraldsson.syntropy.world.Tile;
 import com.haraldsson.syntropy.world.WorldGenerator;
-
-import java.util.List;
 
 public class GameApp extends ApplicationAdapter {
     public static final int TILE_SIZE = 64;
@@ -56,9 +55,9 @@ public class GameApp extends ApplicationAdapter {
     private String statusMessage = "";
     private float statusTimer;
 
-    private boolean successionPending = false;
-    private float successionAutoTimer = 0f;
-    private List<Entity> successionCandidates = null;
+    // Succession UI state (FIX 13)
+    private boolean pendingSuccession = false;
+    private java.util.List<Entity> successionCandidates = new java.util.ArrayList<>();
 
     @Override
     public void create() {
@@ -137,19 +136,29 @@ public class GameApp extends ApplicationAdapter {
     public void render() {
         float delta = Gdx.graphics.getDeltaTime();
 
-        handleGlobalInput(delta);
+        handleSaveLoad();
+        handleResearchInput();
+        handleResetInput();
 
-        if (!successionPending) {
-            playerController.update(delta);
-            aiTaskSystem.update(gameState.ecsWorld, gameState.world, delta);
-            needsSystem.update(gameState.ecsWorld, gameState.world, delta);
-            moodSystem.update(gameState.ecsWorld, gameState.world, delta);
-            buildingProductionSystem.update(gameState.ecsWorld, gameState.world, delta);
-            gameState.research.update(delta);
-            eventSystem.update(gameState.ecsWorld, gameState.world, delta);
-            gameState.pollution.update(gameState.ecsWorld, gameState.world, delta);
-            agingSystem.update(gameState.ecsWorld, gameState.world, delta);
+        // While succession UI is showing, pause all simulation (FIX 13)
+        if (pendingSuccession) {
+            renderWorld();
+            renderSuccessionOverlay();
+            gameHud.update(gameState, playerController, eventSystem);
+            gameHud.getStage().draw();
+            handleSuccessionInput();
+            return;
         }
+
+        playerController.update(delta);
+        aiTaskSystem.update(gameState.ecsWorld, gameState.world, delta);
+        needsSystem.update(gameState.ecsWorld, gameState.world, delta);
+        moodSystem.update(gameState.ecsWorld, gameState.world, delta);
+        buildingProductionSystem.update(gameState.ecsWorld, gameState.world, delta);
+        gameState.research.update(delta);
+        eventSystem.update(gameState.ecsWorld, gameState.world, delta);
+        gameState.pollution.update(gameState.ecsWorld, gameState.world, delta);
+        agingSystem.update(gameState.ecsWorld, gameState.world, delta);
 
         // Check for colonist deaths and fire events
         for (Entity e : gameState.ecsWorld.getEntitiesWith(HealthComponent.class, IdentityComponent.class)) {
@@ -165,55 +174,31 @@ public class GameApp extends ApplicationAdapter {
             }
         }
 
-        // Remove dead entities after 30 seconds
-        java.util.List<Entity> toRemove = new java.util.ArrayList<>();
-        for (Entity e : gameState.ecsWorld.getEntitiesWith(HealthComponent.class)) {
-            HealthComponent health = e.get(HealthComponent.class);
-            if (health.dead) {
-                health.deadTimer += delta;
-                if (health.deadTimer >= 30f) {
-                    toRemove.add(e);
-                }
-            }
-        }
-        for (Entity e : toRemove) {
-            gameState.ecsWorld.removeEntity(e);
-        }
-
-        // Handle leader succession
-        if (!successionPending && agingSystem.isSuccessionNeeded()) {
+        // Handle leader succession (FIX 13: show UI instead of auto-picking)
+        if (agingSystem.isSuccessionNeeded()) {
             showStatus(agingSystem.getDeathMessage());
-            successionCandidates = agingSystem.getSuccessorCandidates(gameState.ecsWorld);
-            if (successionCandidates.isEmpty()) {
-                showStatus("No survivor available! Press Ctrl+R to restart.");
-            } else if (successionCandidates.size() == 1) {
-                successionPending = true;
-                successionAutoTimer = 2f;
-            } else {
-                successionPending = true;
-                successionAutoTimer = 0f;
-            }
-        }
-
-        if (successionPending) {
-            successionAutoTimer -= delta;
-            if (successionCandidates != null && successionCandidates.size() == 1 && successionAutoTimer <= 0f) {
-                pickSuccessor(0);
-            }
-            // Check numeric key presses for multi-candidate choice
-            if (successionCandidates != null && successionCandidates.size() > 1) {
-                for (int i = 0; i < Math.min(successionCandidates.size(), 9); i++) {
-                    if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_1 + i)) {
-                        pickSuccessor(i);
-                        break;
-                    }
+            java.util.List<Entity> candidates = agingSystem.getSuccessorCandidates(gameState.ecsWorld);
+            if (!candidates.isEmpty()) {
+                if (candidates.size() == 1) {
+                    // Auto-pick the only candidate
+                    Entity oldLeader = playerController.getLeader();
+                    Entity successor = candidates.get(0);
+                    agingSystem.promoteToLeader(successor, oldLeader);
+                    playerController.findLeader();
+                    gameState.leaderGeneration++;
+                    IdentityComponent sid = successor.get(IdentityComponent.class);
+                    String name = sid != null ? sid.name : "Unknown";
+                    showStatus("New leader: " + name + " (Gen " + gameState.leaderGeneration + ")");
+                    gameState.events.fireAndLog(EventType.LEADER_SUCCEEDED, name,
+                            "SUCCESSION: " + name + " is the new leader (Gen " + gameState.leaderGeneration + ")");
+                } else {
+                    // Show player the succession UI
+                    pendingSuccession = true;
+                    successionCandidates = candidates;
                 }
+            } else {
+                showStatus("No successor available! Colony is leaderless.");
             }
-        }
-
-        if (!successionPending) {
-            handleSaveLoad();
-            handleResearchInput();
         }
 
         for (Entity e : gameState.ecsWorld.getEntitiesWith(PositionComponent.class, AIComponent.class)) {
@@ -227,59 +212,9 @@ public class GameApp extends ApplicationAdapter {
         if (statusTimer > 0) statusTimer -= delta;
 
         renderWorld();
-        if (successionPending) renderSuccessionOverlay();
 
         gameHud.update(gameState, playerController, eventSystem);
         gameHud.getStage().draw();
-    }
-
-    private void pickSuccessor(int index) {
-        Entity oldLeader = playerController.getLeader();
-        Entity successor = successionCandidates.get(index);
-        agingSystem.promoteToLeader(successor, oldLeader);
-        playerController.findLeader();
-        gameState.leaderGeneration++;
-        IdentityComponent sid = successor.get(IdentityComponent.class);
-        String name = sid != null ? sid.name : "Unknown";
-        showStatus("New leader: " + name + " (Gen " + gameState.leaderGeneration + ")");
-        gameState.events.fireAndLog(EventType.LEADER_SUCCEEDED, name,
-                "SUCCESSION: " + name + " is the new leader (Gen " + gameState.leaderGeneration + ")");
-        successionPending = false;
-        successionCandidates = null;
-    }
-
-    private void renderSuccessionOverlay() {
-        spriteBatch.setProjectionMatrix(gameHud.getStage().getCamera().combined);
-        spriteBatch.begin();
-        float cx = Gdx.graphics.getWidth() / 2f;
-        float ty = Gdx.graphics.getHeight() - 40f;
-        smallFont.setColor(Color.YELLOW);
-        smallFont.draw(spriteBatch, "LEADER HAS DIED — Choose a successor:", cx - 160f, ty);
-        if (successionCandidates != null) {
-            for (int i = 0; i < Math.min(successionCandidates.size(), 9); i++) {
-                Entity c = successionCandidates.get(i);
-                IdentityComponent id = c.get(IdentityComponent.class);
-                AgingComponent aging = c.get(AgingComponent.class);
-                LeaderComponent lc = c.get(LeaderComponent.class);
-                String name = id != null ? id.name : "?";
-                int age = aging != null ? (int) aging.ageYears : 0;
-                String stats = lc != null
-                        ? String.format("Chr%.0f Eng%.0f Sci%.0f Cmb%.0f", lc.charisma, lc.engineering, lc.science, lc.combat)
-                        : "";
-                smallFont.draw(spriteBatch,
-                        (i + 1) + ". " + name + " age " + age + "  " + stats,
-                        cx - 160f, ty - 20f - i * 18f);
-            }
-            if (successionCandidates.size() > 1) {
-                smallFont.draw(spriteBatch, "Press 1–" + Math.min(successionCandidates.size(), 9) + " to choose",
-                        cx - 160f, ty - 20f - successionCandidates.size() * 18f - 10f);
-            } else if (successionCandidates.size() == 1) {
-                smallFont.draw(spriteBatch, "Auto-selecting in " + (int) Math.ceil(successionAutoTimer) + "s...",
-                        cx - 160f, ty - 40f);
-            }
-        }
-        spriteBatch.end();
-        spriteBatch.setProjectionMatrix(camera.combined);
     }
 
     @Override
@@ -291,9 +226,22 @@ public class GameApp extends ApplicationAdapter {
         gameHud.dispose();
     }
 
-    private void handleGlobalInput(float delta) {
-        // Ctrl+R: full game reset at any time
-        if (Gdx.input.isKeyPressed(Input.Keys.CONTROL_LEFT) && Gdx.input.isKeyJustPressed(Input.Keys.R)) {
+    private void handleResearchInput() {
+        if (Gdx.input.isKeyJustPressed(Input.Keys.R) && !Gdx.input.isKeyPressed(Input.Keys.CONTROL_LEFT)
+                && !Gdx.input.isKeyPressed(Input.Keys.CONTROL_RIGHT)) {
+            gameState.research.startNextResearch();
+            Technology current = gameState.research.getCurrentResearch();
+            if (current != null && !current.isUnlocked()) {
+                showStatus("Researching: " + current.getName());
+            } else {
+                showStatus("All research complete!");
+            }
+        }
+    }
+
+    private void handleResetInput() {
+        if ((Gdx.input.isKeyPressed(Input.Keys.CONTROL_LEFT) || Gdx.input.isKeyPressed(Input.Keys.CONTROL_RIGHT))
+                && Gdx.input.isKeyJustPressed(Input.Keys.R)) {
             resetGame();
         }
     }
@@ -303,28 +251,11 @@ public class GameApp extends ApplicationAdapter {
         gameState = new GameState(result.world, result.ecsWorld);
         playerController = new PlayerController(gameState.world, gameState.ecsWorld, camera, viewport, TILE_SIZE);
         eventSystem = new EventSystem();
-        needsSystem = new NeedsSystem();
-        buildingProductionSystem = new BuildingProductionSystem();
-        aiTaskSystem = new AITaskSystem();
-        agingSystem = new AgingSystem();
-        moodSystem = new MoodSystem();
+        pendingSuccession = false;
+        successionCandidates = new java.util.ArrayList<>();
         wireEventBus();
-        successionPending = false;
-        successionCandidates = null;
         centerCameraOnWorld();
-        showStatus("New game started");
-    }
-
-    private void handleResearchInput() {
-        if (Gdx.input.isKeyJustPressed(Input.Keys.R) && !Gdx.input.isKeyPressed(Input.Keys.CONTROL_LEFT)) {
-            gameState.research.startNextResearch();
-            Technology current = gameState.research.getCurrentResearch();
-            if (current != null && !current.isUnlocked()) {
-                showStatus("Researching: " + current.getName());
-            } else {
-                showStatus("All research complete!");
-            }
-        }
+        showStatus("World reset!");
     }
 
     private void handleSaveLoad() {
@@ -481,10 +412,10 @@ public class GameApp extends ApplicationAdapter {
             float barWidth = TILE_SIZE - 16;
             drawBar(cx + 8, barY, barWidth, needs.hunger, 0.2f, 0.8f, 0.3f);
             drawBar(cx + 8, barY - 5, barWidth, needs.health, 0.9f, 0.2f, 0.2f);
+            drawBar(cx + 8, barY - 10, barWidth, needs.energy, 0.2f, 0.6f, 0.9f);
             MoodComponent moodComp = e.get(MoodComponent.class);
             float moodRatio = moodComp != null ? moodComp.mood / 100f : 0.5f;
-            drawBar(cx + 8, barY - 10, barWidth, moodRatio, 0.9f, 0.8f, 0.2f);
-            drawBar(cx + 8, barY - 15, barWidth, needs.energy, 0.1f, 0.8f, 0.9f);
+            drawBar(cx + 8, barY - 15, barWidth, moodRatio, 0.9f, 0.8f, 0.2f);
         }
         shapeRenderer.end();
         spriteBatch.begin();
@@ -497,15 +428,74 @@ public class GameApp extends ApplicationAdapter {
         shapeRenderer.rect(x, y, maxWidth * ratio, 3);
     }
 
-    private void renderWorldText() {
-        // Draw status message centered at top of screen
-        if (statusTimer > 0 && !statusMessage.isEmpty()) {
-            smallFont.setColor(Color.YELLOW);
-            smallFont.draw(spriteBatch, statusMessage,
-                    camera.position.x - camera.viewportWidth * camera.zoom / 2f + 10f,
-                    camera.position.y + camera.viewportHeight * camera.zoom / 2f - 5f);
-        }
+    // ── Succession UI (FIX 13) ──
 
+    private void renderSuccessionOverlay() {
+        int sw = viewport.getScreenWidth();
+        int sh = viewport.getScreenHeight();
+        float panelW = 360f;
+        float panelH = 40f + Math.min(successionCandidates.size(), 5) * 28f + 30f;
+        float px = (sw - panelW) / 2f;
+        float py = (sh - panelH) / 2f;
+
+        // Semi-transparent background
+        shapeRenderer.setProjectionMatrix(new com.badlogic.gdx.math.Matrix4().setToOrtho2D(0, 0, sw, sh));
+        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+        shapeRenderer.setColor(0f, 0f, 0f, 0.7f);
+        shapeRenderer.rect(0, 0, sw, sh);
+        shapeRenderer.setColor(0.15f, 0.15f, 0.2f, 1f);
+        shapeRenderer.rect(px, py, panelW, panelH);
+        shapeRenderer.end();
+
+        // Text
+        spriteBatch.setProjectionMatrix(new com.badlogic.gdx.math.Matrix4().setToOrtho2D(0, 0, sw, sh));
+        spriteBatch.begin();
+        smallFont.setColor(Color.YELLOW);
+        smallFont.draw(spriteBatch, "Choose your successor:", px + 10, py + panelH - 10);
+        int shown = Math.min(successionCandidates.size(), 5);
+        for (int i = 0; i < shown; i++) {
+            Entity c = successionCandidates.get(i);
+            IdentityComponent cid = c.get(IdentityComponent.class);
+            AgingComponent cage = c.get(AgingComponent.class);
+            LeaderComponent lc = c.get(LeaderComponent.class);
+            String name = cid != null ? cid.name : "Unknown";
+            String age = cage != null ? "Age " + (int) cage.ageYears : "";
+            String stats = lc != null
+                    ? String.format("CHA:%.0f ENG:%.0f SCI:%.0f COM:%.0f", lc.charisma, lc.engineering, lc.science, lc.combat)
+                    : "";
+            smallFont.setColor(Color.WHITE);
+            smallFont.draw(spriteBatch, (i + 1) + ". " + name + "  " + age + "  " + stats,
+                    px + 10, py + panelH - 34 - i * 28f);
+        }
+        smallFont.setColor(0.6f, 0.6f, 0.6f, 1f);
+        smallFont.draw(spriteBatch, "Press 1-" + shown + " to select", px + 10, py + 14);
+        spriteBatch.end();
+        spriteBatch.setProjectionMatrix(camera.combined);
+    }
+
+    private void handleSuccessionInput() {
+        int shown = Math.min(successionCandidates.size(), 5);
+        int[] keys = {Input.Keys.NUM_1, Input.Keys.NUM_2, Input.Keys.NUM_3, Input.Keys.NUM_4, Input.Keys.NUM_5};
+        for (int i = 0; i < shown; i++) {
+            if (Gdx.input.isKeyJustPressed(keys[i])) {
+                Entity oldLeader = playerController.getLeader();
+                Entity successor = successionCandidates.get(i);
+                agingSystem.promoteToLeader(successor, oldLeader);
+                playerController.findLeader();
+                gameState.leaderGeneration++;
+                IdentityComponent sid = successor.get(IdentityComponent.class);
+                String name = sid != null ? sid.name : "Unknown";
+                showStatus("New leader: " + name + " (Gen " + gameState.leaderGeneration + ")");
+                gameState.events.fireAndLog(EventType.LEADER_SUCCEEDED, name,
+                        "SUCCESSION: " + name + " is the new leader (Gen " + gameState.leaderGeneration + ")");
+                pendingSuccession = false;
+                successionCandidates = new java.util.ArrayList<>();
+                return;
+            }
+        }
+    }
+
+    private void renderWorldText() {
         for (Entity e : gameState.ecsWorld.getEntitiesWith(IdentityComponent.class, PositionComponent.class, HealthComponent.class)) {
             IdentityComponent id = e.get(IdentityComponent.class);
             PositionComponent pos = e.get(PositionComponent.class);
@@ -526,6 +516,22 @@ public class GameApp extends ApplicationAdapter {
                     smallFont.draw(spriteBatch, ai.taskType.name(), cx + 4, cy + TILE_SIZE + 22);
                 }
             }
+        }
+
+        // Draw status message centered at top of viewport (FIX 9)
+        if (statusTimer > 0 && !statusMessage.isEmpty()) {
+            spriteBatch.end();
+            spriteBatch.setProjectionMatrix(new com.badlogic.gdx.math.Matrix4().setToOrtho2D(0, 0,
+                    viewport.getScreenWidth(), viewport.getScreenHeight()));
+            spriteBatch.begin();
+            smallFont.setColor(Color.YELLOW);
+            GlyphLayout layout = new GlyphLayout(smallFont, statusMessage);
+            smallFont.draw(spriteBatch, statusMessage,
+                    (viewport.getScreenWidth() - layout.width) / 2f,
+                    viewport.getScreenHeight() - 10);
+            spriteBatch.end();
+            spriteBatch.setProjectionMatrix(camera.combined);
+            spriteBatch.begin();
         }
     }
 }

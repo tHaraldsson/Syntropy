@@ -5,6 +5,6 @@ import com.haraldsson.syntropy.ecs.Component;
 public class HealthComponent implements Component {
     public boolean dead;
     public boolean deathEventFired; // prevent firing death event more than once
-    public float deadTimer = 0f;   // increments after death; entity removed after 30s
+    public float deathTimer = 0f;  // counts up after death; entity despawns at 30s (FIX 10)
 }
 

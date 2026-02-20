@@ -24,6 +24,8 @@ public class ThinkNode_Wander extends ThinkNode {
         PositionComponent pos = entity.get(PositionComponent.class);
         if (ai == null || pos == null) return false;
 
+        if (ai.taskType == TaskType.RESTING) return true; // don't interfere with rest timer (FIX 6)
+
         if (ai.shouldPickNewWanderTarget(delta) || ai.taskType == TaskType.IDLE) {
             int tx, ty;
             int attempts = 0;

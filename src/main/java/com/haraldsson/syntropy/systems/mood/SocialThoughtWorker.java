@@ -22,7 +22,13 @@ public class SocialThoughtWorker implements ThoughtWorker {
     @Override
     public float getMoodOffset(Entity entity) {
         AIComponent ai = entity.get(AIComponent.class);
-        if (ai == null || ai.taskType != TaskType.WANDER) return 0f;
+        if (ai == null) return 0f;
+
+        // Mood boost while actively socializing (FIX 3)
+        if (ai.taskType == TaskType.SOCIALIZING) return +15f;
+
+        // Mood boost when wandering near another colonist (original behavior)
+        if (ai.taskType != TaskType.WANDER) return 0f;
 
         PositionComponent pos = entity.get(PositionComponent.class);
         if (pos == null) return 0f;

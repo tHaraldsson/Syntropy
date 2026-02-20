@@ -15,6 +15,7 @@ import com.haraldsson.syntropy.world.World;
 public class ThinkNode_Rest extends ThinkNode {
     private static final float REST_DURATION = 4f;
     private static final float MOVE_SPEED = 2.2f;
+    private static final float BED_STUCK_TIMEOUT = 10f;
 
     @Override
     public float getPriority(Entity entity, ECSWorld ecsWorld, World world) {
@@ -39,6 +40,11 @@ public class ThinkNode_Rest extends ThinkNode {
 
         SleepQualityComponent sq = entity.get(SleepQualityComponent.class);
 
+        // Reset stuck timer if not currently heading to rest (FIX 5)
+        if (ai.taskType != TaskType.RESTING) {
+            ai.stuckTimer = 0f;
+        }
+
         // Find owned bed
         Entity ownedBed = null;
         for (Entity bedEntity : ecsWorld.getEntitiesWith(BedComponent.class)) {
@@ -58,8 +64,16 @@ public class ThinkNode_Rest extends ThinkNode {
                 }
 
                 if (!ai.isAtTarget(pos.x, pos.y)) {
-                    // Walk toward the bed
-                    ai.moveTowardTarget(pos, delta, MOVE_SPEED, world);
+                    // Walk toward the bed; timeout if stuck
+                    ai.stuckTimer += delta;
+                    if (ai.stuckTimer >= BED_STUCK_TIMEOUT) {
+                        // Can't reach bed — fall back to sleeping on the ground
+                        ai.stuckTimer = 0f;
+                        ai.setTask(TaskType.RESTING, (int) pos.x, (int) pos.y);
+                        ai.resetWanderCooldown(REST_DURATION);
+                    } else {
+                        ai.moveTowardTarget(pos, delta, MOVE_SPEED, world);
+                    }
                     return true;
                 }
 

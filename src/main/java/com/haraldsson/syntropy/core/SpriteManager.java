@@ -579,12 +579,20 @@ public class SpriteManager {
     // ── Colonists ──
 
     private void generateColonistTextures() {
+        // NPC colonist — blue work clothes
         generateHumanoid("colonist_alive",
-                0.3f, 0.42f, 0.72f, 0.22f, 0.32f, 0.55f,
-                0.72f, 0.56f, 0.43f, 0.25f, 0.2f, 0.15f, false);
+                0.28f, 0.40f, 0.68f,   // shirt
+                0.20f, 0.30f, 0.52f,   // shirt shadow
+                0.82f, 0.68f, 0.55f,   // skin
+                0.22f, 0.22f, 0.28f,   // pants
+                false);
+        // Leader — golden/orange outfit with crown
         generateHumanoid("colonist_possessed",
-                0.85f, 0.7f, 0.15f, 0.7f, 0.55f, 0.1f,
-                0.72f, 0.56f, 0.43f, 0.3f, 0.22f, 0.12f, true);
+                0.85f, 0.62f, 0.12f,   // shirt (gold)
+                0.70f, 0.48f, 0.08f,   // shirt shadow
+                0.82f, 0.68f, 0.55f,   // skin
+                0.30f, 0.20f, 0.10f,   // pants (dark brown)
+                true);
         generateDeadColonist();
     }
 
@@ -594,124 +602,305 @@ public class SpriteManager {
                                    float skinR, float skinG, float skinB,
                                    float pantsR, float pantsG, float pantsB,
                                    boolean isLeader) {
-        int s = T - 16;
+        int s = T; // 32x32
         Pixmap pm = new Pixmap(s, s, Pixmap.Format.RGBA8888);
-        int cx = s / 2;
+        int cx = s / 2; // 16
 
-        // Drop shadow ellipse
-        pm.setColor(0f, 0f, 0f, 0.2f);
-        pm.fillCircle(cx, s - 4, 8);
+        // Layout (top-down in pixmap, libGDX flips vertically when rendering):
+        // y=0-2:   crown (leader only) / empty (NPC)
+        // y=3-13:  head (center y=8, radius 5)
+        // y=14-15: neck
+        // y=16-22: torso + arms
+        // y=23:    belt
+        // y=24-27: legs
+        // y=28-30: boots
+        // y=31:    shadow
 
-        // Legs
-        int legTop = s - 15;
-        pm.setColor(pantsR, pantsG, pantsB, 1f);
-        pm.fillRectangle(cx - 5, legTop, 3, 10);
-        pm.fillRectangle(cx + 2, legTop, 3, 10);
-        // Shoes
-        pm.setColor(pantsR * 0.6f, pantsG * 0.6f, pantsB * 0.6f, 1f);
-        pm.fillRectangle(cx - 5, legTop + 8, 4, 3);
-        pm.fillRectangle(cx + 2, legTop + 8, 4, 3);
+        // ── Drop shadow ──
+        pm.setColor(0f, 0f, 0f, 0.15f);
+        pm.fillRectangle(cx - 6, 31, 12, 1);
 
-        // Torso
-        int torsoTop = legTop - 12;
-        pm.setColor(sr, sg, sb, 1f);
-        pm.fillRectangle(cx - 6, torsoTop, 12, 13);
-        // Torso shadow (right half)
-        pm.setColor(sdr, sdg, sdb, 1f);
-        pm.fillRectangle(cx + 1, torsoTop + 1, 5, 11);
-        // Belt
-        pm.setColor(pantsR * 0.5f, pantsG * 0.5f, pantsB * 0.5f, 1f);
-        pm.fillRectangle(cx - 6, torsoTop + 11, 12, 2);
-        pm.setColor(0.6f, 0.55f, 0.3f, 1f);
-        pm.drawPixel(cx, torsoTop + 11);
-        pm.drawPixel(cx, torsoTop + 12);
+        // ── Boots ──
+        int bootTop = 28;
+        float bootR = pantsR * 0.4f, bootG = pantsG * 0.4f, bootB = pantsB * 0.4f;
+        pm.setColor(bootR, bootG, bootB, 1f);
+        pm.fillRectangle(cx - 5, bootTop, 4, 3);
+        pm.fillRectangle(cx + 1, bootTop, 4, 3);
+        // Boot soles
+        pm.setColor(bootR * 0.5f, bootG * 0.5f, bootB * 0.5f, 1f);
+        pm.fillRectangle(cx - 5, bootTop + 2, 4, 1);
+        pm.fillRectangle(cx + 1, bootTop + 2, 4, 1);
 
-        // Arms
-        pm.setColor(sr, sg, sb, 1f);
-        pm.fillRectangle(cx - 9, torsoTop + 2, 3, 9);
-        pm.setColor(sdr, sdg, sdb, 1f);
-        pm.fillRectangle(cx + 6, torsoTop + 2, 3, 9);
+        // ── Legs ──
+        int legTop = 24;
+        for (int y = legTop; y < bootTop; y++) {
+            float shade = (y - legTop) / 5f * 0.03f;
+            pm.setColor(clamp(pantsR - shade), clamp(pantsG - shade), clamp(pantsB - shade), 1f);
+            pm.fillRectangle(cx - 5, y, 3, 1);
+            pm.setColor(clamp(pantsR - shade - 0.02f), clamp(pantsG - shade - 0.02f), clamp(pantsB - shade - 0.02f), 1f);
+            pm.fillRectangle(cx + 2, y, 3, 1);
+        }
+
+        // ── Belt ──
+        int beltY = 23;
+        pm.setColor(clamp(pantsR * 0.4f + 0.1f), clamp(pantsG * 0.4f + 0.08f), clamp(pantsB * 0.35f), 1f);
+        pm.fillRectangle(cx - 6, beltY, 12, 1);
+        // Buckle
+        pm.setColor(0.7f, 0.65f, 0.35f, 1f);
+        setPixel(pm, cx, beltY, 0.7f, 0.65f, 0.35f);
+
+        // ── Torso ──
+        int torsoTop = 16;
+        int torsoBot = 23; // exclusive
+        for (int y = torsoTop; y < torsoBot; y++) {
+            for (int x = cx - 6; x <= cx + 5; x++) {
+                float n = (rng.nextFloat() - 0.5f) * 0.02f;
+                float lightSide = (x < cx) ? 0.02f : -0.02f;
+                float yGrad = (y - torsoTop) / 8f * 0.03f;
+                pm.setColor(clamp(sr + n + lightSide - yGrad),
+                            clamp(sg + n + lightSide - yGrad),
+                            clamp(sb + n + lightSide - yGrad), 1f);
+                pm.drawPixel(x, y);
+            }
+        }
+        // Shirt shadow right
+        for (int y = torsoTop + 1; y < torsoBot - 1; y++) {
+            for (int x = cx + 1; x <= cx + 4; x++) {
+                float n = (rng.nextFloat() - 0.5f) * 0.01f;
+                pm.setColor(clamp(sdr + n), clamp(sdg + n), clamp(sdb + n), 1f);
+                pm.drawPixel(x, y);
+            }
+        }
+        // Collar
+        setPixel(pm, cx - 1, torsoTop, skinR, skinG, skinB);
+        setPixel(pm, cx, torsoTop, skinR, skinG, skinB);
+
+        // ── Arms ──
+        for (int y = torsoTop + 1; y < torsoTop + 7; y++) {
+            float yf = (y - torsoTop) / 7f;
+            pm.setColor(clamp(sr + 0.02f - yf * 0.02f), clamp(sg + 0.02f - yf * 0.02f), clamp(sb + 0.02f - yf * 0.02f), 1f);
+            pm.fillRectangle(cx - 8, y, 2, 1);
+            pm.setColor(clamp(sdr - yf * 0.02f), clamp(sdg - yf * 0.02f), clamp(sdb - yf * 0.02f), 1f);
+            pm.fillRectangle(cx + 6, y, 2, 1);
+        }
         // Hands
         pm.setColor(skinR, skinG, skinB, 1f);
-        pm.fillRectangle(cx - 9, torsoTop + 9, 3, 3);
-        pm.fillRectangle(cx + 6, torsoTop + 9, 3, 3);
+        pm.fillRectangle(cx - 8, torsoTop + 6, 2, 2);
+        pm.fillRectangle(cx + 6, torsoTop + 6, 2, 2);
 
-        // Neck
+        // ── Neck ──
         pm.setColor(skinR, skinG, skinB, 1f);
-        pm.fillRectangle(cx - 2, torsoTop - 2, 4, 3);
+        pm.fillRectangle(cx - 2, 14, 4, 2);
 
-        // Head
-        int headY = torsoTop - 8;
-        int headR = 6;
-        for (int y = headY - headR; y <= headY + headR; y++) {
-            for (int x = cx - headR; x <= cx + headR; x++) {
-                float dx = x - cx;
-                float dy = y - headY;
-                if (dx * dx + dy * dy <= headR * headR) {
-                    float shade = (dx > 1) ? -0.04f : 0.02f;
-                    pm.setColor(clamp(skinR + shade), clamp(skinG + shade), clamp(skinB + shade), 1f);
+        // ── Head ──
+        int headCY = 8;
+        int headRad = 5;
+        for (int y = headCY - headRad; y <= headCY + headRad; y++) {
+            for (int x = cx - headRad; x <= cx + headRad; x++) {
+                float ddx = x - cx;
+                float ddy = y - headCY;
+                float dist2 = ddx * ddx + ddy * ddy;
+                if (dist2 <= headRad * headRad) {
+                    float dist = (float) Math.sqrt(dist2) / headRad;
+                    float light = ddx < 0 ? 0.03f : -0.02f;
+                    float edge = dist > 0.7f ? -(dist - 0.7f) * 0.12f : 0f;
+                    pm.setColor(clamp(skinR + light + edge),
+                                clamp(skinG + light + edge),
+                                clamp(skinB + light + edge), 1f);
                     pm.drawPixel(x, y);
                 }
             }
         }
-        // Hair
-        pm.setColor(0.15f, 0.1f, 0.07f, 1f);
-        for (int x = cx - 5; x <= cx + 5; x++) {
-            for (int y = headY - headR; y < headY - headR + 4; y++) {
-                float dx = x - cx;
-                float dy = y - headY;
-                if (dx * dx + dy * dy <= headR * headR) {
-                    pm.drawPixel(x, y);
-                }
-            }
-        }
-        // Eyes
-        pm.setColor(0.1f, 0.1f, 0.1f, 1f);
-        pm.drawPixel(cx - 2, headY);
-        pm.drawPixel(cx + 2, headY);
 
-        // Leader crown/marker
+        // ── Hair ──
+        float hairR, hairG, hairB;
         if (isLeader) {
-            pm.setColor(1f, 0.9f, 0.2f, 1f);
-            pm.fillRectangle(cx - 4, headY - headR - 3, 8, 2);
-            pm.drawPixel(cx - 3, headY - headR - 4);
-            pm.drawPixel(cx, headY - headR - 5);
-            pm.drawPixel(cx + 3, headY - headR - 4);
+            hairR = 0.12f; hairG = 0.08f; hairB = 0.05f;
+        } else {
+            hairR = 0.18f; hairG = 0.14f; hairB = 0.1f;
+        }
+        for (int y = headCY - headRad; y <= headCY - headRad + 3; y++) {
+            for (int x = cx - headRad; x <= cx + headRad; x++) {
+                float ddx = x - cx;
+                float ddy = y - headCY;
+                if (ddx * ddx + ddy * ddy <= headRad * headRad) {
+                    float n = (rng.nextFloat() - 0.5f) * 0.03f;
+                    pm.setColor(clamp(hairR + n), clamp(hairG + n), clamp(hairB + n), 1f);
+                    pm.drawPixel(x, y);
+                }
+            }
+        }
+        // Side hair
+        for (int y = headCY - headRad + 2; y <= headCY; y++) {
+            setPixel(pm, cx - headRad, y, hairR, hairG, hairB);
+            setPixel(pm, cx + headRad, y, hairR, hairG, hairB);
         }
 
-        textures.put(key, new Texture(pm));
+        // ── Eyes ──
+        pm.setColor(0.92f, 0.92f, 0.92f, 1f);
+        pm.fillRectangle(cx - 3, headCY, 2, 2);
+        pm.fillRectangle(cx + 1, headCY, 2, 2);
+        pm.setColor(0.12f, 0.12f, 0.15f, 1f);
+        pm.fillRectangle(cx - 2, headCY, 1, 2);
+        pm.fillRectangle(cx + 2, headCY, 1, 2);
+        // Eye highlights
+        setPixel(pm, cx - 3, headCY, 0.95f, 0.95f, 1f);
+        setPixel(pm, cx + 1, headCY, 0.95f, 0.95f, 1f);
+
+        // ── Mouth ──
+        pm.setColor(clamp(skinR - 0.1f), clamp(skinG - 0.12f), clamp(skinB - 0.12f), 1f);
+        pm.drawLine(cx - 1, headCY + 3, cx + 1, headCY + 3);
+
+        // ── Leader details ──
+        if (isLeader) {
+            // Crown band
+            pm.setColor(1f, 0.85f, 0.1f, 1f);
+            pm.fillRectangle(cx - 5, 1, 10, 2);
+            // Crown points
+            pm.setColor(1f, 0.9f, 0.2f, 1f);
+            setPixel(pm, cx - 4, 0, 1f, 0.9f, 0.2f);
+            setPixel(pm, cx - 1, 0, 1f, 0.9f, 0.2f);
+            setPixel(pm, cx + 2, 0, 1f, 0.9f, 0.2f);
+            setPixel(pm, cx + 4, 0, 1f, 0.9f, 0.2f);
+            // Crown jewel
+            setPixel(pm, cx, 1, 0.9f, 0.15f, 0.15f);
+
+            // Gold epaulettes
+            pm.setColor(0.9f, 0.75f, 0.15f, 1f);
+            pm.fillRectangle(cx - 8, torsoTop, 2, 2);
+            pm.fillRectangle(cx + 6, torsoTop, 2, 2);
+
+            // Cape edges
+            pm.setColor(0.5f, 0.1f, 0.08f, 1f);
+            pm.fillRectangle(cx - 7, torsoTop + 2, 1, 5);
+            pm.fillRectangle(cx + 6, torsoTop + 2, 1, 5);
+        } else {
+            // NPC tool on back
+            pm.setColor(0.4f, 0.38f, 0.35f, 1f);
+            pm.drawLine(cx + 4, torsoTop - 1, cx + 7, torsoTop + 5);
+            setPixel(pm, cx + 3, torsoTop - 1, 0.5f, 0.48f, 0.42f);
+            setPixel(pm, cx + 4, torsoTop - 2, 0.5f, 0.48f, 0.42f);
+            setPixel(pm, cx + 5, torsoTop - 1, 0.5f, 0.48f, 0.42f);
+        }
+
+        // ── Outline ──
+        Pixmap outlined = new Pixmap(s, s, Pixmap.Format.RGBA8888);
+        for (int y = 0; y < s; y++) {
+            for (int x = 0; x < s; x++) {
+                int pixel = pm.getPixel(x, y);
+                if ((pixel & 0xFF) != 0) {
+                    outlined.drawPixel(x, y, pixel);
+                } else {
+                    boolean border = false;
+                    for (int dy = -1; dy <= 1 && !border; dy++) {
+                        for (int dx = -1; dx <= 1 && !border; dx++) {
+                            if (dx == 0 && dy == 0) continue;
+                            int nx = x + dx, ny = y + dy;
+                            if (nx >= 0 && ny >= 0 && nx < s && ny < s) {
+                                if ((pm.getPixel(nx, ny) & 0xFF) != 0) border = true;
+                            }
+                        }
+                    }
+                    if (border) {
+                        outlined.setColor(0.05f, 0.05f, 0.05f, 0.7f);
+                        outlined.drawPixel(x, y);
+                    }
+                }
+            }
+        }
+
+        textures.put(key, new Texture(outlined));
         pm.dispose();
+        outlined.dispose();
     }
 
     private void generateDeadColonist() {
-        int s = T - 16;
+        int s = T;
         Pixmap pm = new Pixmap(s, s, Pixmap.Format.RGBA8888);
-        int cx = s / 2, cy = s / 2;
+        int cx = s / 2, cy = s / 2 + 2;
 
-        // Blood/shadow pool
-        pm.setColor(0.15f, 0.08f, 0.06f, 0.4f);
-        pm.fillCircle(cx, cy + 2, 10);
+        // Dark blood/shadow pool (elliptical)
+        for (int y = cy - 4; y <= cy + 6; y++) {
+            for (int x = cx - 10; x <= cx + 10; x++) {
+                float ddx = (x - cx) / 10f;
+                float ddy = (y - (cy + 1)) / 5f;
+                if (ddx * ddx + ddy * ddy <= 1f) {
+                    float alpha = 0.35f * (1f - (ddx * ddx + ddy * ddy));
+                    pm.setColor(0.25f, 0.06f, 0.04f, alpha);
+                    pm.drawPixel(x, y);
+                }
+            }
+        }
 
-        // Horizontal body (collapsed figure)
-        pm.setColor(0.35f, 0.3f, 0.28f, 1f);
-        pm.fillRectangle(cx - 9, cy - 3, 18, 7);
-        // Legs (angled out)
-        pm.setColor(0.25f, 0.2f, 0.16f, 1f);
-        pm.fillRectangle(cx + 8, cy - 1, 7, 3);
-        pm.fillRectangle(cx + 7, cy + 2, 6, 3);
-        // Head
-        pm.setColor(0.5f, 0.4f, 0.32f, 1f);
-        pm.fillCircle(cx - 10, cy, 4);
-        // Arm
-        pm.setColor(0.35f, 0.3f, 0.28f, 1f);
-        pm.fillRectangle(cx - 4, cy - 6, 3, 4);
-        // X mark
-        pm.setColor(0.6f, 0.15f, 0.1f, 1f);
-        pm.drawLine(cx - 13, cy - 3, cx - 7, cy + 3);
-        pm.drawLine(cx - 7, cy - 3, cx - 13, cy + 3);
+        // Horizontal body (collapsed figure — lying on side)
+        // Torso
+        for (int y = cy - 4; y <= cy + 2; y++) {
+            for (int x = cx - 8; x <= cx + 6; x++) {
+                float n = (rng.nextFloat() - 0.5f) * 0.03f;
+                pm.setColor(clamp(0.32f + n), clamp(0.28f + n), clamp(0.26f + n), 1f);
+                pm.drawPixel(x, y);
+            }
+        }
 
-        textures.put("colonist_dead", new Texture(pm));
+        // Legs (sprawled)
+        pm.setColor(0.2f, 0.18f, 0.16f, 1f);
+        pm.fillRectangle(cx + 5, cy - 2, 8, 3);
+        pm.fillRectangle(cx + 4, cy + 1, 7, 3);
+
+        // Head (side view)
+        float deadSkin = 0.55f;
+        for (int y2 = cy - 6; y2 <= cy + 1; y2++) {
+            for (int x2 = cx - 13; x2 <= cx - 7; x2++) {
+                float ddx = (x2 - (cx - 10));
+                float ddy = (y2 - (cy - 2.5f));
+                if (ddx * ddx + ddy * ddy <= 12) {
+                    pm.setColor(deadSkin, deadSkin * 0.82f, deadSkin * 0.7f, 1f);
+                    pm.drawPixel(x2, y2);
+                }
+            }
+        }
+
+        // Arm (reaching out)
+        pm.setColor(0.32f, 0.28f, 0.26f, 1f);
+        pm.fillRectangle(cx - 5, cy - 8, 4, 5);
+        // Hand
+        pm.setColor(deadSkin, deadSkin * 0.82f, deadSkin * 0.7f, 1f);
+        pm.fillRectangle(cx - 4, cy - 9, 3, 2);
+
+        // X eyes on head
+        pm.setColor(0.7f, 0.15f, 0.1f, 1f);
+        pm.drawLine(cx - 12, cy - 4, cx - 10, cy - 2);
+        pm.drawLine(cx - 10, cy - 4, cx - 12, cy - 2);
+
+        // Outline
+        Pixmap outlined = new Pixmap(s, s, Pixmap.Format.RGBA8888);
+        for (int y = 0; y < s; y++) {
+            for (int x = 0; x < s; x++) {
+                int pixel = pm.getPixel(x, y);
+                if ((pixel & 0xFF) != 0) {
+                    outlined.drawPixel(x, y, pixel);
+                } else {
+                    boolean border = false;
+                    for (int dy = -1; dy <= 1 && !border; dy++) {
+                        for (int dx = -1; dx <= 1 && !border; dx++) {
+                            if (dx == 0 && dy == 0) continue;
+                            int nx = x + dx, ny = y + dy;
+                            if (nx >= 0 && ny >= 0 && nx < s && ny < s) {
+                                if ((pm.getPixel(nx, ny) & 0xFF) != 0) border = true;
+                            }
+                        }
+                    }
+                    if (border) {
+                        outlined.setColor(0.05f, 0.03f, 0.02f, 0.6f);
+                        outlined.drawPixel(x, y);
+                    }
+                }
+            }
+        }
+
+        textures.put("colonist_dead", new Texture(outlined));
         pm.dispose();
+        outlined.dispose();
     }
 
     public Texture getColonistTexture(boolean dead, boolean possessed) {

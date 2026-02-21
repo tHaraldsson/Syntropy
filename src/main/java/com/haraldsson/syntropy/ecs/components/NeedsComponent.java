@@ -9,11 +9,11 @@ import com.haraldsson.syntropy.entities.HungerCategory;
  * Mood is NOT stored here — it's calculated by MoodSystem via ThoughtWorkers (Pattern 2).
  */
 public class NeedsComponent implements Component {
-    public static final float HUNGER_DECAY = 0.02f;   // per second (0–1 scale)
-    public static final float ENERGY_DECAY = 0.012f;
+    public static final float HUNGER_DECAY = 0.006f;   // per second (0–1 scale) — ~167s from full to empty
+    public static final float ENERGY_DECAY = 0.008f;
     public static final float HEALTH_REGEN = 0.003f;
-    public static final float EAT_AMOUNT = 0.4f;
-    public static final float REST_AMOUNT = 0.3f;
+    public static final float EAT_AMOUNT = 0.6f;
+    public static final float REST_AMOUNT = 0.4f;
 
     // Raw values 0.0–1.0
     public float hunger = 1f;

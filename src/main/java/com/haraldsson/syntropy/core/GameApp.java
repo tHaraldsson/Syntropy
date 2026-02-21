@@ -344,11 +344,11 @@ public class GameApp extends ApplicationAdapter {
                         TILE_SIZE - 12, TILE_SIZE - 12);
             }
 
-            int count = Math.min(bc.getOutputCount(), 5);
+            int count = Math.min(bc.getOutputCount(), 3);
             for (int i = 0; i < count; i++) {
                 Texture itemTex = spriteManager.getItemTexture(bc.producedItemType);
                 if (itemTex != null) {
-                    spriteBatch.draw(itemTex, pos.x * TILE_SIZE + 10 + i * 7, pos.y * TILE_SIZE + 10, 5, 5);
+                    spriteBatch.draw(itemTex, pos.x * TILE_SIZE + 8 + i * 6, pos.y * TILE_SIZE + 8, 5, 5);
                 }
             }
         }
@@ -369,11 +369,44 @@ public class GameApp extends ApplicationAdapter {
             for (int x = 0; x < gameState.world.getWidth(); x++) {
                 Tile tile = gameState.world.getTile(x, y);
                 if (tile.getGroundItems().isEmpty()) continue;
-                for (int i = 0; i < tile.getGroundItems().size(); i++) {
-                    Item item = tile.getGroundItems().get(i);
-                    Texture tex = spriteManager.getItemTexture(item.getType());
-                    if (tex != null) {
-                        spriteBatch.draw(tex, x * TILE_SIZE + 8 + i * 9, y * TILE_SIZE + 8, 7, 7);
+
+                if (tile.isStockpile()) {
+                    // Stockpile: show item type icons with counts as text
+                    float tx = x * TILE_SIZE + 2;
+                    float ty = y * TILE_SIZE + TILE_SIZE - 2;
+                    int stoneCount = tile.countItems(com.haraldsson.syntropy.entities.ItemType.STONE);
+                    int foodCount = tile.countItems(com.haraldsson.syntropy.entities.ItemType.FOOD);
+                    int woodCount = tile.countItems(com.haraldsson.syntropy.entities.ItemType.WOOD);
+                    int line = 0;
+                    if (stoneCount > 0) {
+                        Texture tex = spriteManager.getItemTexture(com.haraldsson.syntropy.entities.ItemType.STONE);
+                        if (tex != null) spriteBatch.draw(tex, tx, ty - 10 - line * 12, 8, 8);
+                        smallFont.setColor(0.7f, 0.7f, 0.65f, 1f);
+                        smallFont.draw(spriteBatch, "x" + stoneCount, tx + 10, ty - 1 - line * 12);
+                        line++;
+                    }
+                    if (foodCount > 0) {
+                        Texture tex = spriteManager.getItemTexture(com.haraldsson.syntropy.entities.ItemType.FOOD);
+                        if (tex != null) spriteBatch.draw(tex, tx, ty - 10 - line * 12, 8, 8);
+                        smallFont.setColor(0.9f, 0.75f, 0.2f, 1f);
+                        smallFont.draw(spriteBatch, "x" + foodCount, tx + 10, ty - 1 - line * 12);
+                        line++;
+                    }
+                    if (woodCount > 0) {
+                        Texture tex = spriteManager.getItemTexture(com.haraldsson.syntropy.entities.ItemType.WOOD);
+                        if (tex != null) spriteBatch.draw(tex, tx, ty - 10 - line * 12, 8, 8);
+                        smallFont.setColor(0.6f, 0.4f, 0.15f, 1f);
+                        smallFont.draw(spriteBatch, "x" + woodCount, tx + 10, ty - 1 - line * 12);
+                    }
+                } else {
+                    // Non-stockpile: show one small item icon per ground item (max 3)
+                    int shown = Math.min(tile.getGroundItems().size(), 3);
+                    for (int i = 0; i < shown; i++) {
+                        Item item = tile.getGroundItems().get(i);
+                        Texture tex = spriteManager.getItemTexture(item.getType());
+                        if (tex != null) {
+                            spriteBatch.draw(tex, x * TILE_SIZE + 4 + i * 9, y * TILE_SIZE + 4, 8, 8);
+                        }
                     }
                 }
             }
@@ -381,51 +414,29 @@ public class GameApp extends ApplicationAdapter {
     }
 
     private void renderColonists() {
+        int half = TILE_SIZE / 2;
         for (Entity e : gameState.ecsWorld.getEntitiesWith(PositionComponent.class, HealthComponent.class, NeedsComponent.class)) {
             PositionComponent pos = e.get(PositionComponent.class);
             HealthComponent health = e.get(HealthComponent.class);
             InventoryComponent inv = e.get(InventoryComponent.class);
             boolean isLeader = e.has(LeaderComponent.class);
 
-            float cx = pos.x * TILE_SIZE;
-            float cy = pos.y * TILE_SIZE;
+            // pos is the character center; draw sprite centered on it
+            float sx = pos.x * TILE_SIZE - half;
+            float sy = pos.y * TILE_SIZE - half;
 
             Texture tex = spriteManager.getColonistTexture(health.dead, isLeader);
-            int pad = TILE_SIZE / 6;
-            spriteBatch.draw(tex, cx + pad, cy + pad, TILE_SIZE - TILE_SIZE / 3, TILE_SIZE - TILE_SIZE / 3);
+            spriteBatch.draw(tex, sx, sy, TILE_SIZE, TILE_SIZE);
 
             if (health.dead) continue;
 
             if (inv != null && inv.carriedItem != null) {
                 Texture itemTex = spriteManager.getItemTexture(inv.carriedItem.getType());
                 if (itemTex != null) {
-                    spriteBatch.draw(itemTex, cx + 18, cy + 18, 7, 7);
+                    spriteBatch.draw(itemTex, sx + TILE_SIZE - 8, sy + TILE_SIZE - 10, 10, 10);
                 }
             }
         }
-
-        // Need bars via ShapeRenderer
-        spriteBatch.end();
-        shapeRenderer.setProjectionMatrix(camera.combined);
-        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
-        for (Entity e : gameState.ecsWorld.getEntitiesWith(PositionComponent.class, HealthComponent.class, NeedsComponent.class)) {
-            HealthComponent health = e.get(HealthComponent.class);
-            if (health.dead) continue;
-            PositionComponent pos = e.get(PositionComponent.class);
-            NeedsComponent needs = e.get(NeedsComponent.class);
-            float cx = pos.x * TILE_SIZE;
-            float cy = pos.y * TILE_SIZE;
-            float barY = cy + TILE_SIZE - 6;
-            float barWidth = TILE_SIZE - 16;
-            drawBar(cx + 8, barY, barWidth, needs.hunger, 0.2f, 0.8f, 0.3f);
-            drawBar(cx + 8, barY - 5, barWidth, needs.health, 0.9f, 0.2f, 0.2f);
-            drawBar(cx + 8, barY - 10, barWidth, needs.energy, 0.2f, 0.6f, 0.9f);
-            MoodComponent moodComp = e.get(MoodComponent.class);
-            float moodRatio = moodComp != null ? moodComp.mood / 100f : 0.5f;
-            drawBar(cx + 8, barY - 15, barWidth, moodRatio, 0.9f, 0.8f, 0.2f);
-        }
-        shapeRenderer.end();
-        spriteBatch.begin();
     }
 
     private void drawBar(float x, float y, float maxWidth, float ratio, float r, float g, float b) {
@@ -503,25 +514,21 @@ public class GameApp extends ApplicationAdapter {
     }
 
     private void renderWorldText() {
+        int half = TILE_SIZE / 2;
         for (Entity e : gameState.ecsWorld.getEntitiesWith(IdentityComponent.class, PositionComponent.class, HealthComponent.class)) {
             IdentityComponent id = e.get(IdentityComponent.class);
             PositionComponent pos = e.get(PositionComponent.class);
             HealthComponent health = e.get(HealthComponent.class);
             boolean isLeader = e.has(LeaderComponent.class);
-            float cx = pos.x * TILE_SIZE;
-            float cy = pos.y * TILE_SIZE;
+            float sx = pos.x * TILE_SIZE - half;
+            float sy = pos.y * TILE_SIZE - half;
             if (health.dead) {
                 smallFont.setColor(Color.GRAY);
-                smallFont.draw(spriteBatch, id.name + " (dead)", cx - 4, cy + TILE_SIZE + 10);
+                smallFont.draw(spriteBatch, id.name + " (dead)", sx - 4, sy + TILE_SIZE + 10);
             } else {
                 smallFont.setColor(isLeader ? Color.RED : Color.WHITE);
                 String prefix = isLeader ? "[L] " : "";
-                smallFont.draw(spriteBatch, prefix + id.name, cx + 4, cy + TILE_SIZE + 10);
-                AIComponent ai = e.get(AIComponent.class);
-                if (ai != null && !isLeader) {
-                    smallFont.setColor(0.7f, 0.7f, 0.7f, 1f);
-                    smallFont.draw(spriteBatch, ai.taskType.name(), cx + 4, cy + TILE_SIZE + 22);
-                }
+                smallFont.draw(spriteBatch, prefix + id.name, sx, sy + TILE_SIZE + 10);
             }
         }
 

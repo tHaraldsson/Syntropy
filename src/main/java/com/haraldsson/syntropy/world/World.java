@@ -77,20 +77,25 @@ public class World {
         return type != TerrainType.WATER && type != TerrainType.STONE;
     }
 
-    /** Body radius used for 4-corner collision checks — prevents clipping into wall sprites. */
-    private static final float COLLISION_BODY_RADIUS = 0.35f;
+    // Feet-based collision: only the character's feet determine blocking.
+    // pos is the character center (tile+0.5). Feet are at the bottom of the sprite.
+    private static final float FEET_HALF_W = 0.25f;  // narrow horizontal extent
+    private static final float FEET_TOP    = -0.35f;  // feet top offset from center (just below center)
+    private static final float FEET_BOT    = -0.48f;  // feet bottom offset from center (near sprite bottom)
 
     /**
-     * 4-corner body check — returns true if a circular body of radius COLLISION_BODY_RADIUS
-     * centered at (cx, cy) can occupy that position without clipping into walls.
-     * FIX BUG-COLLISION: sprite-aligned collision using Math.floor() + 4-corner body check (2026-02-20)
+     * Feet-based collision — returns true if the character's feet can stand at this position.
+     * Checks a narrow rectangle at the bottom of the sprite (the feet area).
      */
     public boolean canMove(float cx, float cy) {
-        float r = COLLISION_BODY_RADIUS;
-        return isPassable((int) Math.floor(cx - r), (int) Math.floor(cy - r))
-            && isPassable((int) Math.floor(cx + r), (int) Math.floor(cy - r))
-            && isPassable((int) Math.floor(cx - r), (int) Math.floor(cy + r))
-            && isPassable((int) Math.floor(cx + r), (int) Math.floor(cy + r));
+        float left  = cx - FEET_HALF_W;
+        float right = cx + FEET_HALF_W;
+        float top   = cy + FEET_TOP;
+        float bot   = cy + FEET_BOT;
+        return isPassable((int) Math.floor(left),  (int) Math.floor(top))
+            && isPassable((int) Math.floor(right), (int) Math.floor(top))
+            && isPassable((int) Math.floor(left),  (int) Math.floor(bot))
+            && isPassable((int) Math.floor(right), (int) Math.floor(bot));
     }
 
     public int[] findNearestPassableTile(float fromX, float fromY) {

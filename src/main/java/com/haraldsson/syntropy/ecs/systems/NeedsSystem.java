@@ -54,7 +54,7 @@ public class NeedsSystem extends GameSystem {
 
             // Starvation damage — only when STARVING, at half the original rate
             if (needs.getHungerCategory() == HungerCategory.STARVING) {
-                needs.damage(0.025f * delta);
+                needs.damage(0.01f * delta);
             }
 
             // Health regen when well-fed and rested

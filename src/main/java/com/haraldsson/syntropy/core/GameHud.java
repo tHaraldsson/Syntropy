@@ -57,16 +57,18 @@ public class GameHud {
         // Top row: resources (left) + colonists (right)
         Table topRow = new Table();
 
-        // Left column
+        // Left column — compact panel with dark background
         Table leftCol = new Table();
         leftCol.top().left();
+        leftCol.setBackground(skin.newDrawable("panel-bg"));
+        leftCol.pad(8);
         resourceLabel = new Label("", skin, "hud");
         resourceLabel.setColor(Color.WHITE);
         leftCol.add(resourceLabel).left().row();
 
         possessionLabel = new Label("", skin, "hud-bold");
         possessionLabel.setColor(Color.RED);
-        leftCol.add(possessionLabel).left().padTop(8).row();
+        leftCol.add(possessionLabel).left().padTop(6).row();
 
         pickupLabel = new Label("", skin, "hud");
         pickupLabel.setColor(Color.CYAN);
@@ -76,21 +78,30 @@ public class GameHud {
         leaderInfoLabel.setColor(0.9f, 0.85f, 0.6f, 1f);
         leftCol.add(leaderInfoLabel).left().padTop(4).row();
 
-        // Right column
+        // Right column — compact panel with dark background
         Table rightCol = new Table();
         rightCol.top().right();
+        rightCol.setBackground(skin.newDrawable("panel-bg"));
+        rightCol.pad(8);
         colonistListLabel = new Label("", skin, "hud");
         colonistListLabel.setColor(Color.WHITE);
         colonistListLabel.setAlignment(Align.topRight);
         rightCol.add(colonistListLabel).right();
 
-        topRow.add(leftCol).expand().fill().left().top();
-        topRow.add(rightCol).expand().fill().right().top();
+        // Left wraps content, spacer expands in the middle, right wraps content
+        topRow.add(leftCol).left().top();
+        topRow.add().expandX(); // spacer
+        topRow.add(rightCol).right().top();
 
-        root.add(topRow).expand().fill().row();
+        root.add(topRow).expandX().fillX().top().row();
 
-        // Bottom section
+        // Spacer to push bottom bar down
+        root.add().expand().row();
+
+        // Bottom section — with background for readability
         Table bottomRow = new Table();
+        bottomRow.setBackground(skin.newDrawable("panel-bg"));
+        bottomRow.pad(4);
 
         // Colonist bar (Pattern 7) — horizontal scrollable row of colonist entries
         colonistBarTable = new Table();
@@ -126,26 +137,35 @@ public class GameHud {
         pm.dispose();
         s.add("white", whitePixel);
 
-        // Fonts
+        // Fonts — all slightly larger for readability
         BitmapFont defaultFont = new BitmapFont();
+        defaultFont.getData().setScale(1.0f);
         BitmapFont smallFont = new BitmapFont();
-        smallFont.getData().setScale(0.8f);
+        smallFont.getData().setScale(0.9f);
         BitmapFont boldFont = new BitmapFont();
-        boldFont.getData().setScale(1.1f);
+        boldFont.getData().setScale(1.15f);
 
         s.add("default-font", defaultFont);
         s.add("small-font", smallFont);
         s.add("bold-font", boldFont);
 
-        // Label styles
+        // Label styles — bright colors for readability
         Label.LabelStyle hudStyle = new Label.LabelStyle(defaultFont, Color.WHITE);
         s.add("hud", hudStyle);
 
-        Label.LabelStyle smallStyle = new Label.LabelStyle(smallFont, Color.GRAY);
+        Label.LabelStyle smallStyle = new Label.LabelStyle(smallFont, Color.WHITE);
         s.add("small", smallStyle);
 
         Label.LabelStyle boldStyle = new Label.LabelStyle(boldFont, Color.WHITE);
         s.add("hud-bold", boldStyle);
+
+        // Semi-transparent panel background
+        Pixmap bgPm = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
+        bgPm.setColor(0f, 0f, 0f, 0.7f);
+        bgPm.fill();
+        Texture bgTex = new Texture(bgPm);
+        bgPm.dispose();
+        s.add("panel-bg", bgTex);
 
         return s;
     }
@@ -166,7 +186,7 @@ public class GameHud {
         }
         resourceLabel.setText("Stockpile  Stone: " + totalStone + "  Food: " + totalFood + "  Wood: " + totalWood);
 
-        // Colonist list — compact single-line format
+        // Colonist list — compact with percentage bars
         Entity leaderEntity = playerController.getLeader();
         StringBuilder col = new StringBuilder("-- Colony --\n");
         for (Entity e : ecsWorld.getEntitiesWith(IdentityComponent.class, NeedsComponent.class, HealthComponent.class)) {
@@ -174,17 +194,25 @@ public class GameHud {
             HealthComponent health = e.get(HealthComponent.class);
             NeedsComponent needs = e.get(NeedsComponent.class);
             AIComponent ai = e.get(AIComponent.class);
+            MoodComponent moodComp = e.get(MoodComponent.class);
             boolean isLeader = e.has(LeaderComponent.class);
             if (health.dead) {
-                col.append(id.name).append("  DEAD\n");
+                col.append(id.name).append(" - DEAD\n");
             } else {
                 col.append(isLeader ? "[L] " : "    ");
                 col.append(id.name);
-                col.append("  H:").append(needs.getHungerCategory().name());
-                col.append("  E:").append(needs.getEnergyCategory().name());
                 if (ai != null && !isLeader) {
-                    col.append("  ").append(ai.taskType.name());
+                    col.append(" (").append(formatTask(ai.taskType.name())).append(")");
                 }
+                col.append("\n");
+                int hp = (int)(needs.health * 100);
+                int hunger = (int)(needs.hunger * 100);
+                int energy = (int)(needs.energy * 100);
+                int mood = moodComp != null ? (int)(moodComp.mood) : 50;
+                col.append("    HP:").append(hp).append("%");
+                col.append(" Food:").append(hunger).append("%");
+                col.append(" Zzz:").append(energy).append("%");
+                col.append(" Mood:").append(mood).append("%");
                 col.append("\n");
             }
         }
@@ -260,14 +288,14 @@ public class GameHud {
             HealthComponent health = e.get(HealthComponent.class);
 
             Table entry = new Table();
-            entry.pad(4).padLeft(6).padRight(6);
+            entry.pad(4).padLeft(8).padRight(8);
 
             if (health.dead) {
                 String name = truncateName(id.name, 8);
-                Label nameLabel = new Label(name, skin, "small");
+                Label nameLabel = new Label(name, skin, "hud");
                 nameLabel.setColor(Color.GRAY);
-                Label deadLabel = new Label("DEAD", skin, "small");
-                deadLabel.setColor(Color.GRAY);
+                Label deadLabel = new Label("DEAD", skin, "hud");
+                deadLabel.setColor(0.6f, 0.2f, 0.2f, 1f);
                 entry.add(nameLabel).left().row();
                 entry.add(deadLabel).left();
             } else {
@@ -277,7 +305,7 @@ public class GameHud {
                 String name = truncateName(id.name, 8);
                 String status = deriveStatus(ai, e, ecsWorld);
 
-                Label nameLabel = new Label(name, skin, "small");
+                Label nameLabel = new Label(name, skin, "hud");
                 nameLabel.setColor(Color.WHITE);
                 Label statusLabel = new Label(status, skin, "small");
                 statusLabel.setColor(Color.YELLOW);
@@ -286,16 +314,18 @@ public class GameHud {
                 entry.add(statusLabel).left().row();
 
                 if (needs != null) {
-                    Label hungerBarLabel = new Label("H:" + makeBar(needs.hunger, 5), skin, "small");
-                    hungerBarLabel.setColor(Color.ORANGE);
-                    Label energyBarLabel = new Label("E:" + makeBar(needs.energy, 5), skin, "small");
-                    energyBarLabel.setColor(Color.CYAN);
-                    entry.add(hungerBarLabel).left().row();
-                    entry.add(energyBarLabel).left();
+                    int h = (int)(needs.hunger * 100);
+                    int en = (int)(needs.energy * 100);
+                    Label hungerLabel = new Label("Food:" + h + "%", skin, "small");
+                    hungerLabel.setColor(h > 50 ? Color.GREEN : h > 20 ? Color.ORANGE : Color.RED);
+                    Label energyLabel = new Label("Zzz:" + en + "%", skin, "small");
+                    energyLabel.setColor(en > 50 ? Color.CYAN : en > 20 ? Color.ORANGE : Color.RED);
+                    entry.add(hungerLabel).left().row();
+                    entry.add(energyLabel).left();
                 }
             }
 
-            colonistBarTable.add(entry).top().padRight(4);
+            colonistBarTable.add(entry).top().padRight(6);
         }
     }
 
@@ -338,6 +368,21 @@ public class GameHud {
         }
         sb.append(']');
         return sb.toString();
+    }
+
+    private String formatTask(String taskName) {
+        switch (taskName) {
+            case "MOVE_TO_STOCKPILE": return "Hauling";
+            case "MOVE_TO_MINER": return "Mining";
+            case "MOVE_TO_FOOD_GROWER": return "Farming";
+            case "MOVE_TO_FOOD": return "Eating";
+            case "HAULING": return "Hauling";
+            case "RESTING": return "Sleeping";
+            case "WANDER": return "Wandering";
+            case "SOCIALIZING": return "Chatting";
+            case "IDLE": return "Idle";
+            default: return taskName;
+        }
     }
 
     private String truncateName(String name, int maxLen) {

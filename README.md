@@ -1,76 +1,125 @@
-# Syntropy
+# Syntropy — A 2D Colony Automation Game
 
-A 2D colony automation-survival simulation game, inspired by Factorio and RimWorld. Built with Java 21 and LibGDX.
+> *Inspired by Factorio and RimWorld*
 
-## Unique Twist: Possession Mechanic
+Syntropy is a Java-based, 2D colony automation-survival simulation. You control a **leader character** who guides NPC colonists, automates resource chains, manages buildings, and keeps the colony alive. The AI handles routine tasks — eating, sleeping, hauling — while you focus on strategy.
 
-Double-click any colonist to **possess** them — you directly control that colonist with WASD while the rest of the colony runs on AI. Double-click again to release. Seamlessly swap between hands-on play and high-level management.
+## Gameplay
 
-## Features
+### The Leader (You)
+- **WASD** to move around the colony
+- **Double-click a colonist** to possess them (direct control) — double-click again to release
+- **E** to pick up/drop items at your feet
+- Build beds for colonists to rest on
 
-### Core Gameplay
-- **Procedurally generated** 30×30 world using simplex noise (water, sand, grass, dirt, stone terrain)
-- **2 colonists** with full AI: wandering, hauling, eating, resting
-- **3 need systems**: Hunger (green), Energy (blue), Mood (yellow) — all visible as bars
-- **Death**: colonists die when hunger reaches zero; auto-unpossess on death
+### The Colonists (AI)
+Each colonist has needs:
+- **Hunger** (green) — they eat when food appears in the stockpile
+- **Energy** (blue) — they sleep in beds
+- **Mood** (yellow) — affected by work conditions and social interaction
+- **Health** (red) — damaged by starvation; slowly regenerates when well-fed and rested
+
+Colonists autonomously:
+- **Haul** resources from buildings to the stockpile (capped at 5 per item type)
+- **Eat** from the stockpile when hungry
+- **Rest** in beds when tired
+- **Wander** and socialize when needs are met
 
 ### Buildings
 - **Miner** (×2) — produces stone every 5 seconds
-- **Food Grower** — produces food every 10 seconds
+- **Food Grower** — produces food every 6 seconds
+- **Beds** (×4) — colonists sleep here to recover energy
 
-### Automation
-- Colonists autonomously haul resources from buildings to the stockpile
-- AI priority system: Eat → Rest → Haul → Wander
+### The Stockpile
+The stockpile tile displays a live count of each item type with a small icon:
+```
+  [stone]x5
+  [food]x9
+  [wood]x3
+```
 
-### Research & Progression
-- Press **R** to begin researching the next technology
-- Tech tree: Fast Mining → Advanced Agriculture → Smelting → Conveyor Belts
-- Research progresses passively over time
+### Terrain & Collision
+- **Water** & **Stone** — impassable
+- **Grass**, **Dirt**, **Sand** — walkable
+- Collision is **feet-based**: characters can stand at the very edge of water/stone, and only get blocked when their feet would step onto it
 
-### Random Events
-- Events trigger every 30–60 seconds
-- Bountiful harvest, heat wave, morale boost, food spoilage, exhaustion
-- Event log displayed on screen
+## HUD Layout
 
-### Save & Load
-- **F5** to save, **F9** to load (JSON format)
-- Full world state serialized: tiles, buildings, colonists, items
+**Top-Left Panel:**
+- Stockpile resource summary
+- Leader name, age, and status
+- Pickup help text
 
-### HUD
-- Stockpile resource counts
-- Building output counts
-- Colonist list with needs and current task
-- Research progress
-- Event log
-- Controls help bar
+**Top-Right Panel:**
+- Full colonist list with stats
+- `Name (Task)` with `HP:X% Food:X% Zzz:X% Mood:X%`
+- Color-coded percentages: green (healthy), orange (warning), red (critical)
+
+**Bottom Panel:**
+- Horizontal colonist bar showing quick-stats for all colonists
+- Event log (last 3 events)
 
 ## Controls
 
 | Input | Action |
 |---|---|
-| **Double-click** colonist | Possess / unpossess |
-| **WASD** | Move colonist (possessed) / Pan camera (free) |
-| **E** | Pick up / drop item at your feet (possessed) |
-| **R** | Start next research |
+| **WASD** | Move leader / Pan camera |
+| **Double-click colonist** | Possess / unpossess |
+| **E** | Pick up / drop item (when possessed) |
+| **B** | Enter/exit build mode (place beds — costs 3 wood each) |
 | **Scroll** | Zoom in/out |
-| **F5** | Save game |
+| **F5** | Save game (JSON) |
 | **F9** | Load game |
+
+## Save & Load
+- Press **F5** to save — creates `syntropy_save.json` with full world state
+- Press **F9** to load — restores all tiles, buildings, colonists, items, and positions
+
+## Architecture
+
+### Entity-Component-System (ECS)
+All colonists and buildings are **entities** composed of small, reusable components:
+- `PositionComponent` — x, y location (tile center + 0.5)
+- `NeedsComponent` — hunger, energy, health (0.0–1.0 scale)
+- `HealthComponent` — dead flag, death timer
+- `InventoryComponent` — carried item
+- `AIComponent` — task, target, stuck timer
+- `IdentityComponent` — name, age
+
+### Systems
+- **NeedsSystem** — ticks hunger/energy decay, applies starvation damage, regens health when well-fed
+- **AITaskSystem** — runs the think tree (eat → rest → haul → wander)
+- **BuildingProductionSystem** — generates items from buildings
+- **ThinkNode_*** — individual decision nodes (hunger check, path-to-stockpile, etc.)
+- **EventSystem** — instance-based event bus (no static state)
+
+### World
+- **50×50 tile grid** procedurally generated with Perlin/Simplex noise
+- Tile types: Water, Sand, Grass, Dirt, Stone
+- Each tile stores: terrain type, building entity, ground items
+- **Collision** checks character feet (narrow box at sprite bottom) against passable terrain
 
 ## Tech Stack
 
-- **Language**: Java 21
+- **Language**: Java 21 (via Gradle toolchain)
 - **Engine**: LibGDX 1.12.1 (LWJGL3 backend)
 - **Build**: Gradle 8.8
+- **Testing**: JUnit 5
+- **Serialization**: Gson (for save/load)
 
 ## Project Structure
 
 ```
 src/main/java/com/haraldsson/syntropy/
-├── core/          GameMain, GameApp, SaveLoadSystem, SaveData
-├── entities/      Colonist, Building, Miner, FoodGrower, Item, ItemType, TaskType
-├── input/         PlayerController (possession, camera, pickup)
-├── systems/       TaskSystem, ResearchSystem, EventSystem, Technology
-└── world/         World, Tile, TerrainType, WorldGenerator, SimplexNoise
+├── core/              GameApp, GameMain, GameState, GameHud, SpriteManager
+├── ecs/               ECSWorld, Entity, Component base classes
+├── ecs/components/    Position, Needs, Health, Inventory, AI, Identity, etc.
+├── ecs/systems/       NeedsSystem, AITaskSystem, BuildingProductionSystem
+├── ai/nodes/          ThinkNode_Eat, ThinkNode_Haul, ThinkNode_Rest, etc.
+├── entities/          ItemType, TaskType, ColonistRole, Item
+├── input/             PlayerController (movement, possession, camera)
+├── world/             World, Tile, TerrainType, WorldGenerator, Pathfinder
+└── systems/           EventSystem, EventType, SaveLoadSystem, SaveData
 ```
 
 ## Run
@@ -79,11 +128,23 @@ src/main/java/com/haraldsson/syntropy/
 ./gradlew run
 ```
 
-Or click the green ▶ play button next to `main()` in `GameMain.java` in IntelliJ.
+Or use the green ▶ play button in IntelliJ next to `main()` in `GameMain.java`.
 
 ## Build
 
 ```bash
 ./gradlew build
 ```
+
+Output JAR: `build/libs/syntropy-1.0-SNAPSHOT.jar`
+
+## Recent Improvements (2026-02-21)
+
+- **Feet-based collision** — Characters only blocked when their feet touch impassable terrain; can stand at water's edge
+- **Better HUD panels** — Compact, dark-background panels that wrap content (not full-screen black boxes)
+- **Readable stats** — All text bright white; colonist bars show color-coded percentages
+- **Balanced hunger** — Slower drain (slower starvation), faster food production, bigger meals
+- **Stockpile display** — Visual item counts with icons instead of tiny sprites
+- **Centered sprites** — Character sprites centered on their logical position for accurate collision
+- **Improved AI hauling** — Stops hauling when stockpile reaches 5 of any item type
 

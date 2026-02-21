@@ -56,7 +56,7 @@ public final class WorldGenerator {
 
         // Food Grower
         int[] fg = findValidTile(tiles, width, height, width / 2, height / 2, world);
-        createBuilding(ecsWorld, world, tiles, fg[0], fg[1], "FOOD_GROWER", 10f, 5, ItemType.FOOD);
+        createBuilding(ecsWorld, world, tiles, fg[0], fg[1], "FOOD_GROWER", 6f, 5, ItemType.FOOD);
 
         // Woodcutter
         int[] wc = findValidTile(tiles, width, height, width / 2 - 4, height / 2, world);

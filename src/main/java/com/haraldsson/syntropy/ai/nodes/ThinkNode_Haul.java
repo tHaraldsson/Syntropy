@@ -12,10 +12,12 @@ import com.haraldsson.syntropy.world.World;
 
 /**
  * Haul items from building output to stockpile. Priority 50 (assigned job level).
+ * Stops hauling a resource type if stockpile already has 5+ of it.
  */
 public class ThinkNode_Haul extends ThinkNode {
     private static final float MOVE_SPEED = 2.2f;
     private static final float STUCK_TIMEOUT_SECONDS = 5f;
+    private static final int STOCKPILE_CAP_PER_TYPE = 5;
 
     @Override
     public float getPriority(Entity entity, ECSWorld ecsWorld, World world) {
@@ -26,10 +28,15 @@ public class ThinkNode_Haul extends ThinkNode {
         InventoryComponent inv = entity.get(InventoryComponent.class);
         if (inv != null && inv.carriedItem != null) return 50f; // must deliver
 
+        Tile stockpile = world.getStockpileTile();
+
         // FIX BUG1: haul logic now handles all item types including WOOD (2026-02-20)
         for (Entity bldg : ecsWorld.getEntitiesWith(BuildingComponent.class)) {
             BuildingComponent bc = bldg.get(BuildingComponent.class);
-            if (bc.hasOutput()) return 50f;
+            if (!bc.hasOutput()) continue;
+            // Skip if stockpile already has enough of this item type
+            if (stockpile != null && stockpile.countItems(bc.producedItemType) >= STOCKPILE_CAP_PER_TYPE) continue;
+            return 50f;
         }
         return 0f;
     }
@@ -61,13 +68,17 @@ public class ThinkNode_Haul extends ThinkNode {
             return true;
         }
 
+        Tile stockpile = world.getStockpileTile();
+
         // FIX BUG1: haul logic now handles all item types including WOOD (2026-02-20)
-        // Find the nearest building with output to pick up (any building type)
+        // Find the nearest building with output to pick up (skip if stockpile full for that type)
         Entity nearest = null;
         float nearestDist = Float.MAX_VALUE;
         for (Entity bldg : ecsWorld.getEntitiesWith(BuildingComponent.class, PositionComponent.class)) {
             BuildingComponent bc = bldg.get(BuildingComponent.class);
             if (!bc.hasOutput()) continue;
+            // Skip buildings whose output type is already at cap in stockpile
+            if (stockpile != null && stockpile.countItems(bc.producedItemType) >= STOCKPILE_CAP_PER_TYPE) continue;
             PositionComponent bp = bldg.get(PositionComponent.class);
             float dx = pos.x - bp.x;
             float dy = pos.y - bp.y;

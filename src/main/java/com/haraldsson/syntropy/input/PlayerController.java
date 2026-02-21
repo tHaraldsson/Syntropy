@@ -120,14 +120,52 @@ public class PlayerController {
         NeedsComponent needs = leader.get(NeedsComponent.class);
         if (needs == null) return;
 
-        // F key: eat food from stockpile when hungry
+        // F key: eat food from stockpile or nearby source when hungry
         if (Gdx.input.isKeyJustPressed(Input.Keys.F)) {
             if (needs.getHungerCategory() != HungerCategory.FED) {
+                // 1. Check stockpile first
                 Tile stockpile = world.getStockpileTile();
                 if (stockpile != null && stockpile.hasItem(ItemType.FOOD)) {
                     stockpile.takeFirstItem(ItemType.FOOD);
                     needs.eat();
                     showPickupMessage("Ate food");
+                    return;
+                }
+                // 2. Scan radius 2 for a FOOD_GROWER with output
+                PositionComponent pos = leader.get(PositionComponent.class);
+                if (pos != null) {
+                    int tileX = Math.round(pos.x - 0.5f);
+                    int tileY = Math.round(pos.y - 0.5f);
+                    boolean ate = false;
+                    outer:
+                    for (int dy = -2; dy <= 2; dy++) {
+                        for (int dx = -2; dx <= 2; dx++) {
+                            Tile tile = world.getTile(tileX + dx, tileY + dy);
+                            if (tile == null) continue;
+                            Entity buildingEntity = tile.getBuildingEntity();
+                            if (buildingEntity != null) {
+                                BuildingComponent bc = buildingEntity.get(BuildingComponent.class);
+                                if (bc != null && bc.hasOutput() && bc.producedItemType == ItemType.FOOD) {
+                                    bc.takeOutput();
+                                    needs.eat();
+                                    showPickupMessage("Ate food from grower");
+                                    ate = true;
+                                    break outer;
+                                }
+                            }
+                            // 3. Check ground items for FOOD
+                            if (tile.hasItem(ItemType.FOOD)) {
+                                tile.takeFirstItem(ItemType.FOOD);
+                                needs.eat();
+                                showPickupMessage("Ate food from ground");
+                                ate = true;
+                                break outer;
+                            }
+                        }
+                    }
+                    if (!ate) {
+                        showPickupMessage("No food available");
+                    }
                 } else {
                     showPickupMessage("No food available");
                 }

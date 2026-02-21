@@ -725,6 +725,7 @@ public class SpriteManager {
     private void generateItemTextures() {
         generateStoneItem();
         generateFoodItem();
+        generateWoodItem();
     }
 
     private void generateStoneItem() {
@@ -750,6 +751,30 @@ public class SpriteManager {
         pm.setColor(0.3f, 0.28f, 0.25f, 1f);
         pm.drawLine(3, 5, 7, 8);
         textures.put("item_STONE", new Texture(pm));
+        pm.dispose();
+    }
+
+    private void generateWoodItem() {
+        int s = 12;
+        Pixmap pm = new Pixmap(s, s, Pixmap.Format.RGBA8888);
+        // Horizontal brown log
+        int logH = 4;
+        int logY = (s - logH) / 2;
+        // Log body
+        pm.setColor(0.45f, 0.28f, 0.1f, 1f);
+        pm.fillRectangle(1, logY, s - 2, logH);
+        // Log end caps
+        pm.setColor(0.38f, 0.22f, 0.08f, 1f);
+        pm.fillRectangle(1, logY, 2, logH);
+        pm.fillRectangle(s - 3, logY, 2, logH);
+        // Grain lines
+        pm.setColor(0.38f, 0.22f, 0.08f, 1f);
+        pm.drawLine(3, logY + 1, s - 4, logY + 1);
+        pm.drawLine(3, logY + 3, s - 4, logY + 3);
+        // Highlight
+        pm.setColor(0.55f, 0.35f, 0.14f, 1f);
+        pm.drawLine(2, logY, s - 3, logY);
+        textures.put("item_WOOD", new Texture(pm));
         pm.dispose();
     }
 
